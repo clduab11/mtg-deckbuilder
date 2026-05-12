@@ -80,7 +80,13 @@ class CardCatalog:
     """Case-insensitive card lookup for offline validation and features."""
 
     def __init__(self, cards: list[Card]) -> None:
-        self._cards_by_name = {card.normalized_name: card for card in cards}
+        cards_by_name: dict[str, list[Card]] = {}
+        for card in cards:
+            cards_by_name.setdefault(card.normalized_name, []).append(card)
+        self._cards_by_name = {
+            normalized_name: tuple(named_cards)
+            for normalized_name, named_cards in cards_by_name.items()
+        }
 
     @classmethod
     def from_records(cls, records: list[Mapping[str, Any]]) -> "CardCatalog":
@@ -99,7 +105,30 @@ class CardCatalog:
         return cls.from_records(records)
 
     def get(self, name: str) -> Card | None:
-        return self._cards_by_name.get(normalize_card_name(name))
+        matches = self.matches(name)
+        if not matches:
+            return None
+        return matches[-1]
+
+    def matches(self, name: str) -> tuple[Card, ...]:
+        return self._cards_by_name.get(normalize_card_name(name), ())
+
+    def resolve(
+        self,
+        name: str,
+        set_code: str | None = None,
+        collector_number: str | None = None,
+    ) -> tuple[Card, ...]:
+        matches = self.matches(name)
+        if set_code is not None:
+            normalized_set = set_code.upper()
+            matches = tuple(card for card in matches if card.set_code == normalized_set)
+        if collector_number is not None:
+            normalized_collector = collector_number.strip()
+            matches = tuple(
+                card for card in matches if card.collector_number == normalized_collector
+            )
+        return matches
 
     def __contains__(self, name: object) -> bool:
         return isinstance(name, str) and self.get(name) is not None

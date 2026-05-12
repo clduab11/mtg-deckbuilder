@@ -55,6 +55,11 @@ class ValidatorTests(unittest.TestCase):
         catalog = CardCatalog.from_records(
             [
                 {
+                    "name": "Plains",
+                    "type_line": "Basic Land - Plains",
+                    "legalities": {"standard": "legal"},
+                },
+                {
                     "name": "Banned Spell",
                     "type_line": "Sorcery",
                     "legalities": {"standard": "banned"},
@@ -66,7 +71,167 @@ class ValidatorTests(unittest.TestCase):
         result = validate_deck(deck, catalog=catalog)
 
         self.assertFalse(result.is_valid)
-        self.assertIn("banned_card", {issue.code for issue in result.issues})
+        self.assertIn("banned_in_format", {issue.code for issue in result.issues})
+
+    def test_valid_deck_resolves_against_catalog(self):
+        catalog = CardCatalog.from_records(
+            [
+                {
+                    "name": "Plains",
+                    "type_line": "Basic Land - Plains",
+                    "legalities": {"standard": "legal"},
+                },
+                {
+                    "name": "Known Spell",
+                    "type_line": "Sorcery",
+                    "legalities": {"standard": "legal"},
+                },
+            ]
+        )
+        deck = Decklist(mainboard=(DeckEntry(4, "Known Spell"), DeckEntry(56, "Plains")))
+
+        result = validate_deck(deck, catalog=catalog)
+
+        self.assertTrue(result.is_valid)
+        self.assertEqual(result.issues, ())
+
+    def test_unknown_card_fails_with_catalog(self):
+        catalog = CardCatalog.from_records(
+            [
+                {
+                    "name": "Plains",
+                    "type_line": "Basic Land - Plains",
+                    "legalities": {"standard": "legal"},
+                }
+            ]
+        )
+        deck = Decklist(mainboard=(DeckEntry(4, "Unknown Spell"), DeckEntry(56, "Plains")))
+
+        result = validate_deck(deck, catalog=catalog)
+
+        self.assertFalse(result.is_valid)
+        self.assertIn("unknown_card", {issue.code for issue in result.issues})
+
+    def test_illegal_card_fails_with_catalog(self):
+        catalog = CardCatalog.from_records(
+            [
+                {
+                    "name": "Plains",
+                    "type_line": "Basic Land - Plains",
+                    "legalities": {"standard": "legal"},
+                },
+                {
+                    "name": "Illegal Spell",
+                    "type_line": "Sorcery",
+                    "legalities": {"standard": "not_legal"},
+                },
+            ]
+        )
+        deck = Decklist(mainboard=(DeckEntry(4, "Illegal Spell"), DeckEntry(56, "Plains")))
+
+        result = validate_deck(deck, catalog=catalog)
+
+        self.assertFalse(result.is_valid)
+        self.assertIn("illegal_in_format", {issue.code for issue in result.issues})
+
+    def test_missing_legality_is_explicit_warning(self):
+        catalog = CardCatalog.from_records(
+            [
+                {
+                    "name": "Plains",
+                    "type_line": "Basic Land - Plains",
+                    "legalities": {"standard": "legal"},
+                },
+                {
+                    "name": "Mystery Spell",
+                    "type_line": "Sorcery",
+                    "legalities": {"historic": "legal"},
+                },
+            ]
+        )
+        deck = Decklist(mainboard=(DeckEntry(4, "Mystery Spell"), DeckEntry(56, "Plains")))
+
+        result = validate_deck(deck, catalog=catalog)
+
+        self.assertTrue(result.is_valid)
+        matching = [issue for issue in result.issues if issue.code == "missing_legality_data"]
+        self.assertEqual(len(matching), 1)
+        self.assertEqual(matching[0].severity, "warning")
+
+    def test_ambiguous_catalog_name_fails_without_set_collector(self):
+        catalog = CardCatalog.from_records(
+            [
+                {
+                    "name": "Plains",
+                    "type_line": "Basic Land - Plains",
+                    "legalities": {"standard": "legal"},
+                },
+                {
+                    "name": "Ambiguous Spell",
+                    "type_line": "Sorcery",
+                    "set_code": "AAA",
+                    "collector_number": "1",
+                    "legalities": {"standard": "legal"},
+                },
+                {
+                    "name": "Ambiguous Spell",
+                    "type_line": "Sorcery",
+                    "set_code": "BBB",
+                    "collector_number": "2",
+                    "legalities": {"standard": "legal"},
+                },
+            ]
+        )
+        deck = Decklist(mainboard=(DeckEntry(4, "Ambiguous Spell"), DeckEntry(56, "Plains")))
+
+        result = validate_deck(deck, catalog=catalog)
+
+        self.assertFalse(result.is_valid)
+        self.assertIn("ambiguous_card", {issue.code for issue in result.issues})
+
+    def test_set_collector_disambiguates_catalog_name(self):
+        catalog = CardCatalog.from_records(
+            [
+                {
+                    "name": "Plains",
+                    "type_line": "Basic Land - Plains",
+                    "legalities": {"standard": "legal"},
+                },
+                {
+                    "name": "Ambiguous Spell",
+                    "type_line": "Sorcery",
+                    "set_code": "AAA",
+                    "collector_number": "1",
+                    "legalities": {"standard": "legal"},
+                },
+                {
+                    "name": "Ambiguous Spell",
+                    "type_line": "Sorcery",
+                    "set_code": "BBB",
+                    "collector_number": "2",
+                    "legalities": {"standard": "legal"},
+                },
+            ]
+        )
+        deck = Decklist(
+            mainboard=(
+                DeckEntry(4, "Ambiguous Spell", set_code="AAA", collector_number="1"),
+                DeckEntry(56, "Plains"),
+            )
+        )
+
+        result = validate_deck(deck, catalog=catalog)
+
+        self.assertTrue(result.is_valid)
+        self.assertEqual(result.issues, ())
+
+    def test_no_catalog_mode_preserves_heuristic_unknown_behavior(self):
+        deck = Decklist(mainboard=(DeckEntry(4, "Unknown Spell"), DeckEntry(56, "Plains")))
+
+        result = validate_deck(deck)
+
+        self.assertTrue(result.is_valid)
+        self.assertNotIn("unknown_card", {issue.code for issue in result.issues})
 
     def test_valid_deck_has_no_export_compatibility_issue(self):
         deck = Decklist(mainboard=(DeckEntry(60, "Plains"),))

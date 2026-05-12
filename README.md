@@ -19,7 +19,9 @@ Early foundation. The current implementation is intentionally small, determinist
   - sideboard size
   - non-basic copy limits
   - basic land copy exception
-  - banned legality when local card metadata provides it
+  - optional local catalog-backed card-name resolution
+  - unknown and ambiguous card diagnostics when a catalog is supplied
+  - missing, illegal, and banned legality diagnostics when local card metadata provides them
   - Arena export round-trip compatibility
 - Extract basic deck features:
   - colors
@@ -73,7 +75,7 @@ mtgdeckbuilder --help
 Validate an Arena decklist:
 
 ```bash
-python3 -m mtgdeckbuilder validate data/raw/sample_arena_deck.txt --cards data/processed/sample_cards.json
+python3 -m mtgdeckbuilder validate data/raw/sample_arena_deck.txt --catalog data/processed/sample_cards.json
 ```
 
 Export canonical Arena import text:
@@ -85,7 +87,7 @@ python3 -m mtgdeckbuilder export data/raw/sample_arena_deck.txt
 Run the smoke evaluator:
 
 ```bash
-python3 -m mtgdeckbuilder eval-smoke data/raw/sample_arena_deck.txt --cards data/processed/sample_cards.json
+python3 -m mtgdeckbuilder eval-smoke data/raw/sample_arena_deck.txt --catalog data/processed/sample_cards.json
 ```
 
 Normalize already-downloaded Scryfall bulk-style data:
@@ -113,6 +115,7 @@ python3 -m mtgdeckbuilder normalize-report data/processed/sample_cards.json
 ```
 
 The default constructed legality format is `standard`. Override it with `--format`.
+The older `--cards` option remains accepted as a compatibility alias for catalog input.
 
 Inspect supported source profiles:
 
@@ -209,6 +212,8 @@ External sites are compatibility targets only. Users must provide exports themse
 
 Validation is deterministic and local. The project does not infer current card legality, oracle text, bans, restrictions, or metagame truth from LLM memory. Those facts must come from already-downloaded Scryfall, MTGJSON, Wizards of the Coast, or other official/current sources supplied by the user.
 
+Without `--catalog`, validation stays in heuristic deck-construction mode: it checks counts, sideboard size, basic-land copy exceptions by known Arena names, and export compatibility. With `--catalog`, each parsed Arena card name is resolved against the normalized local catalog. Catalog-backed validation reports `unknown_card`, `ambiguous_card`, `missing_legality_data`, `illegal_in_format`, and `banned_in_format` diagnostics. Missing legality is a warning because the catalog may be incomplete; explicit illegal or banned legality is an error.
+
 Performance claims are also evidence-bound. A deck is not labeled as a “60% BO1” deck unless local performance data includes enough games for the configured threshold. Card-only CSVs can support legal deck construction, but cannot support winning-deck claims.
 
 ## Data Directories
@@ -227,7 +232,7 @@ Milestone assumptions and validation notes live in `reports/experiments/`.
 - Offline Scryfall/MTGJSON bulk-data workflow documentation.
 - Broader source profile fixtures for MTGDecks, MTGAZone, MTG Arena Pro, 17Lands, Moxfield, Archidekt, GitHub, GitLab, and Bitbucket-hosted CSV examples.
 - Richer deck feature extraction.
-- Format-aware legality profiles from local card catalogs.
+- Richer format-aware legality and restriction profiles from local card catalogs.
 - Matchup and metagame summaries from offline snapshots.
 - Deterministic report generation for deck comparison.
 

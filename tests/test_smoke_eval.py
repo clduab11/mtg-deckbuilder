@@ -40,6 +40,30 @@ class SmokeEvaluatorTests(unittest.TestCase):
         self.assertFalse(result.valid)
         self.assertIn("mainboard_too_small", {issue.code for issue in result.issues})
 
+    def test_catalog_backed_failure_stops_when_requested(self):
+        catalog = CardCatalog.from_records(
+            [
+                {
+                    "name": "Plains",
+                    "type_line": "Basic Land - Plains",
+                    "color_identity": ["W"],
+                    "mana_value": 0,
+                    "legalities": {"standard": "legal"},
+                }
+            ]
+        )
+
+        result = run_smoke_evaluation(
+            "Deck\n56 Plains\n4 Unknown Spell\n",
+            catalog=catalog,
+            stop_on_validation_failure=True,
+        )
+
+        self.assertFalse(result.valid)
+        self.assertIn("unknown_card", {issue.code for issue in result.issues})
+        self.assertEqual(result.features, {})
+        self.assertEqual(result.arena_export, "")
+
     def test_parse_error_returns_invalid_smoke_result(self):
         result = run_smoke_evaluation("Deck\nthis is not a deck line\n")
 

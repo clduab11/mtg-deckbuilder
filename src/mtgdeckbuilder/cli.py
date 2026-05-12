@@ -39,6 +39,7 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_parser = subparsers.add_parser("validate", help="validate an Arena decklist")
     validate_parser.add_argument("deck_path")
     validate_parser.add_argument("--cards", dest="cards_path")
+    validate_parser.add_argument("--catalog", dest="catalog_path")
     validate_parser.add_argument("--format", dest="format_name", default="standard")
     validate_parser.set_defaults(func=_cmd_validate)
 
@@ -49,6 +50,7 @@ def _build_parser() -> argparse.ArgumentParser:
     smoke_parser = subparsers.add_parser("eval-smoke", help="run parser, validator, features, and export")
     smoke_parser.add_argument("deck_path")
     smoke_parser.add_argument("--cards", dest="cards_path")
+    smoke_parser.add_argument("--catalog", dest="catalog_path")
     smoke_parser.add_argument("--format", dest="format_name", default="standard")
     smoke_parser.set_defaults(func=_cmd_eval_smoke)
 
@@ -103,17 +105,18 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _cmd_validate(args: argparse.Namespace) -> int:
     deck = parse_arena_deck(Path(args.deck_path).read_text(encoding="utf-8"))
-    catalog = CardCatalog.from_json_file(args.cards_path) if args.cards_path else None
+    catalog_path = args.catalog_path or args.cards_path
+    catalog = CardCatalog.from_json_file(catalog_path) if catalog_path else None
     result = validate_deck(
         deck,
         catalog=catalog,
         config=ValidationConfig(format_name=args.format_name),
     )
+    for issue in result.issues:
+        print(f"{issue.severity}: {issue.code}: {issue.message}")
     if result.is_valid:
         print("valid")
         return 0
-    for issue in result.issues:
-        print(f"{issue.severity}: {issue.code}: {issue.message}")
     return 1
 
 
@@ -127,6 +130,7 @@ def _cmd_eval_smoke(args: argparse.Namespace) -> int:
     result = run_smoke_file(
         args.deck_path,
         cards_path=args.cards_path,
+        catalog_path=args.catalog_path,
         format_name=args.format_name,
     )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))

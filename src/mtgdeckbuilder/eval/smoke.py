@@ -33,6 +33,7 @@ def run_smoke_evaluation(
     deck_text: str,
     catalog: CardCatalog | None = None,
     format_name: str = "standard",
+    stop_on_validation_failure: bool = False,
 ) -> SmokeEvalResult:
     """Parse, validate, featureize, and export one decklist."""
 
@@ -51,6 +52,13 @@ def run_smoke_evaluation(
         catalog=catalog,
         config=ValidationConfig(format_name=format_name),
     )
+    if stop_on_validation_failure and not validation.is_valid:
+        return SmokeEvalResult(
+            valid=False,
+            issues=validation.issues,
+            features={},
+            arena_export="",
+        )
     return SmokeEvalResult(
         valid=validation.is_valid,
         issues=validation.issues,
@@ -62,8 +70,15 @@ def run_smoke_evaluation(
 def run_smoke_file(
     deck_path: str | Path,
     cards_path: str | Path | None = None,
+    catalog_path: str | Path | None = None,
     format_name: str = "standard",
 ) -> SmokeEvalResult:
-    catalog = CardCatalog.from_json_file(cards_path) if cards_path else None
+    resolved_catalog_path = catalog_path or cards_path
+    catalog = CardCatalog.from_json_file(resolved_catalog_path) if resolved_catalog_path else None
     deck_text = Path(deck_path).read_text(encoding="utf-8")
-    return run_smoke_evaluation(deck_text, catalog=catalog, format_name=format_name)
+    return run_smoke_evaluation(
+        deck_text,
+        catalog=catalog,
+        format_name=format_name,
+        stop_on_validation_failure=catalog_path is not None,
+    )

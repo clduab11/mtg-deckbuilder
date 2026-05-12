@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from collections import Counter
 from dataclasses import dataclass
 
 from mtgdeckbuilder.export.arena import assert_arena_export_compatible
-from mtgdeckbuilder.ingest.arena import Decklist
+from mtgdeckbuilder.ingest.arena import DeckEntry, Decklist
 from mtgdeckbuilder.ingest.cards import CardCatalog, is_basic_land_name, normalize_card_name
 
 
@@ -105,20 +106,7 @@ def validate_deck(
             )
 
     if catalog is not None:
-        for normalized_name, name in sorted(display_names.items()):
-            card = catalog.get(name)
-            if card is None:
-                continue
-            legality = card.legalities.get(cfg.format_name)
-            if legality and legality.casefold() == "banned":
-                issues.append(
-                    ValidationIssue(
-                        code="banned_card",
-                        severity="error",
-                        message=f"{name} is banned in {cfg.format_name}.",
-                        card_name=name,
-                    )
-                )
+        issues.extend(_catalog_validation_issues(deck, catalog, cfg))
 
     try:
         assert_arena_export_compatible(deck)
@@ -154,3 +142,91 @@ def _is_basic_land(name: str, catalog: CardCatalog | None) -> bool:
         if card is not None:
             return card.is_basic_land
     return is_basic_land_name(name)
+
+
+def _catalog_validation_issues(
+    deck: Decklist,
+    catalog: CardCatalog,
+    cfg: ValidationConfig,
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    seen: set[tuple[str, str | None, str | None]] = set()
+    for entry in sorted(deck.entries(), key=_entry_sort_key):
+        key = (normalize_card_name(entry.name), entry.set_code, entry.collector_number)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        matches = catalog.resolve(entry.name, entry.set_code, entry.collector_number)
+        if not matches:
+            issues.append(
+                ValidationIssue(
+                    code="unknown_card",
+                    severity="error",
+                    message=f"{entry.name} was not found in the catalog.",
+                    card_name=entry.name,
+                )
+            )
+            continue
+
+        if len(matches) > 1:
+            issues.append(
+                ValidationIssue(
+                    code="ambiguous_card",
+                    severity="error",
+                    message=(
+                        f"{entry.name} matches {len(matches)} catalog records; "
+                        "include set and collector number to disambiguate."
+                    ),
+                    card_name=entry.name,
+                )
+            )
+            continue
+
+        card = matches[0]
+        legality = _format_legality(card.legalities, cfg.format_name)
+        if legality is None:
+            issues.append(
+                ValidationIssue(
+                    code="missing_legality_data",
+                    severity="warning",
+                    message=f"{entry.name} has no {cfg.format_name} legality in the catalog.",
+                    card_name=entry.name,
+                )
+            )
+        elif legality == "banned":
+            issues.append(
+                ValidationIssue(
+                    code="banned_in_format",
+                    severity="error",
+                    message=f"{entry.name} is banned in {cfg.format_name}.",
+                    card_name=entry.name,
+                )
+            )
+        elif legality in {"not_legal", "illegal"}:
+            issues.append(
+                ValidationIssue(
+                    code="illegal_in_format",
+                    severity="error",
+                    message=f"{entry.name} is not legal in {cfg.format_name}.",
+                    card_name=entry.name,
+                )
+            )
+    return issues
+
+
+def _entry_sort_key(entry: DeckEntry) -> tuple[str, str, str]:
+    return (
+        normalize_card_name(entry.name),
+        entry.set_code or "",
+        entry.collector_number or "",
+    )
+
+
+def _format_legality(legalities: object, format_name: str) -> str | None:
+    if not isinstance(legalities, Mapping):
+        return None
+    for key, value in legalities.items():
+        if str(key).casefold() == format_name.casefold():
+            return str(value).casefold()
+    return None
