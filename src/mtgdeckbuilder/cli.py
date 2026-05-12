@@ -11,7 +11,7 @@ from mtgdeckbuilder.eval.smoke import run_smoke_file
 from mtgdeckbuilder.export.arena import export_arena_deck
 from mtgdeckbuilder.ingest.arena import ArenaParseError, parse_arena_deck
 from mtgdeckbuilder.ingest.cards import CardCatalog
-from mtgdeckbuilder.ingest.normalization import normalize_cards_file
+from mtgdeckbuilder.ingest.normalization import normalize_cards_file, normalization_report_file
 from mtgdeckbuilder.rules.validator import ValidationConfig, validate_deck
 
 
@@ -54,6 +54,10 @@ def _build_parser() -> argparse.ArgumentParser:
     normalize_parser.add_argument("output_json")
     normalize_parser.set_defaults(func=_cmd_normalize_cards)
 
+    report_parser = subparsers.add_parser("normalize-report", help="print normalization metadata diagnostics")
+    report_parser.add_argument("normalized_catalog_json")
+    report_parser.set_defaults(func=_cmd_normalize_report)
+
     return parser
 
 
@@ -92,4 +96,9 @@ def _cmd_eval_smoke(args: argparse.Namespace) -> int:
 def _cmd_normalize_cards(args: argparse.Namespace) -> int:
     count = normalize_cards_file(args.source, args.input_json, args.output_json)
     print(f"normalized {count} cards to {args.output_json}")
+    return 0
+
+
+def _cmd_normalize_report(args: argparse.Namespace) -> int:
+    print(normalization_report_file(args.normalized_catalog_json), end="")
     return 0

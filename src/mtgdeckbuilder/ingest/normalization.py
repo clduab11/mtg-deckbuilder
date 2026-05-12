@@ -49,6 +49,15 @@ def normalize_cards_file(source: str, input_json: str | Path, output_json: str |
     return int(catalog["metadata"]["normalized_count"])
 
 
+def normalization_report_file(catalog_json: str | Path) -> str:
+    """Read a normalized catalog and format its embedded metadata report."""
+
+    with Path(catalog_json).open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    metadata = _catalog_metadata(payload)
+    return format_normalization_report(metadata)
+
+
 def normalize_payload(
     source: str,
     payload: Any,
@@ -92,6 +101,47 @@ def normalize_payload(
         },
         "cards": cards,
     }
+
+
+def format_normalization_report(metadata: Mapping[str, Any]) -> str:
+    """Format normalization metadata as deterministic human-readable diagnostics."""
+
+    skipped_reasons = _mapping_value(metadata, "skipped_reasons")
+    missing_fields = _mapping_value(metadata, "missing_high_value_fields_by_field_name")
+    lines = [
+        "Normalization Report",
+        f"schema_version: {_display_value(metadata.get('schema_version'))}",
+        f"source: {_display_value(metadata.get('source'))}",
+        f"input_path: {_display_value(metadata.get('input_path'))}",
+        f"output_path: {_display_value(metadata.get('output_path'))}",
+        f"generated_at: {_display_value(metadata.get('generated_at'))}",
+        f"input_count: {_display_value(metadata.get('input_count'))}",
+        f"normalized_count: {_display_value(metadata.get('normalized_count'))}",
+        f"skipped_count: {_display_value(metadata.get('skipped_count'))}",
+        "skipped_reasons:",
+    ]
+    lines.extend(_format_mapping_lines(skipped_reasons))
+    lines.extend(
+        [
+            "missing_high_value_fields:",
+            f"  total: {_display_value(metadata.get('missing_high_value_fields_count'))}",
+        ]
+    )
+    lines.extend(_format_mapping_lines(missing_fields))
+    return "\n".join(lines) + "\n"
+
+
+def _catalog_metadata(payload: Any) -> Mapping[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise ValueError("normalized catalog must be a JSON object")
+    if not isinstance(payload.get("cards"), list):
+        raise ValueError("normalized catalog must include a top-level 'cards' list")
+    metadata = payload.get("metadata")
+    if metadata is None:
+        raise ValueError("normalized catalog is missing embedded metadata")
+    if not isinstance(metadata, Mapping):
+        raise ValueError("normalized catalog metadata must be a JSON object")
+    return metadata
 
 
 def _scryfall_records(payload: Any) -> list[Mapping[str, Any]]:
@@ -261,3 +311,20 @@ def _is_missing_value(value: Any) -> bool:
 
 def _utc_timestamp() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _mapping_value(metadata: Mapping[str, Any], key: str) -> Mapping[str, Any]:
+    value = metadata.get(key, {})
+    if not isinstance(value, Mapping):
+        return {}
+    return value
+
+
+def _format_mapping_lines(values: Mapping[str, Any]) -> list[str]:
+    if not values:
+        return ["  none"]
+    return [f"  {key}: {values[key]}" for key in sorted(values)]
+
+
+def _display_value(value: Any) -> str:
+    return "None" if value is None else str(value)
