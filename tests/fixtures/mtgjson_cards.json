@@ -1,0 +1,50 @@
+{
+  "data": {
+    "cards": [
+      {
+        "colorIdentity": [],
+        "colors": [],
+        "identifiers": {
+          "mtgoArenaId": "76543",
+          "scryfallId": "00000000-0000-0000-0000-000000000101"
+        },
+        "layout": "normal",
+        "legalities": {
+          "commander": "Legal"
+        },
+        "manaCost": "{2}",
+        "manaValue": 2.0,
+        "name": "Arcane Signet",
+        "number": "653",
+        "rarity": "uncommon",
+        "setCode": "cmm",
+        "text": "{T}: Add one mana of any color in your commander's color identity.",
+        "type": "Artifact"
+      },
+      {
+        "colorIdentity": [
+          "B"
+        ],
+        "colors": [
+          "B"
+        ],
+        "identifiers": {
+          "scryfallId": "00000000-0000-0000-0000-000000000102"
+        },
+        "layout": "normal",
+        "legalities": {
+          "pioneer": "Legal",
+          "standard": "Legal"
+        },
+        "manaCost": "{B}",
+        "manaValue": 1.0,
+        "name": "Duress",
+        "number": "92",
+        "rarity": "common",
+        "text": "Target opponent reveals their hand. You choose a noncreature, nonland card from it. That player discards that card.",
+        "type": "Sorcery"
+      }
+    ],
+    "code": "tst"
+  }
+}

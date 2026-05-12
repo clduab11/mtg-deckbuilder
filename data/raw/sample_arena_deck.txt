@@ -1,0 +1,18 @@
+Deck
+24 Plains
+4 Hopeful Initiate
+4 Recruitment Officer
+4 Thalia, Guardian of Thraben
+4 Adeline, Resplendent Cathar
+4 Brutal Cathar
+4 Ossification
+4 Lay Down Arms
+4 Wedding Announcement
+4 The Wandering Emperor
+
+Sideboard
+3 Destroy Evil
+3 Loran of the Third Path
+3 Temporary Lockdown
+2 Unlicensed Hearse
+4 Knockout Blow

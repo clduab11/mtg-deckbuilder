@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mtgdeckbuilder"
+version = "0.1.0"
+description = "Offline MTG Arena deck parsing, validation, feature extraction, and export tools."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+mtgdeckbuilder = "mtgdeckbuilder.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

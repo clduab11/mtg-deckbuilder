@@ -1,0 +1,54 @@
+[
+  {
+    "arena_id": 67356,
+    "cmc": 1.0,
+    "collector_number": "141",
+    "color_identity": [
+      "R"
+    ],
+    "colors": [
+      "R"
+    ],
+    "digital": false,
+    "games": [
+      "paper",
+      "arena",
+      "mtgo"
+    ],
+    "id": "00000000-0000-0000-0000-000000000001",
+    "layout": "normal",
+    "legalities": {
+      "legacy": "legal",
+      "standard": "not_legal"
+    },
+    "mana_cost": "{R}",
+    "name": "Lightning Bolt",
+    "oracle_text": "Lightning Bolt deals 3 damage to any target.",
+    "rarity": "common",
+    "set": "clu",
+    "type_line": "Instant"
+  },
+  {
+    "cmc": 0.0,
+    "collector_number": "284",
+    "color_identity": [
+      "U"
+    ],
+    "colors": [],
+    "digital": false,
+    "games": [
+      "paper"
+    ],
+    "id": "00000000-0000-0000-0000-000000000002",
+    "layout": "normal",
+    "legalities": {
+      "standard": "legal"
+    },
+    "mana_cost": "",
+    "name": "Island",
+    "oracle_text": "({T}: Add {U}.)",
+    "rarity": "common",
+    "set": "mom",
+    "type_line": "Basic Land - Island"
+  }
+]
