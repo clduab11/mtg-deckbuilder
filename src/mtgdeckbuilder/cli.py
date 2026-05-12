@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import sys
 
+from mtgdeckbuilder.advisor.report import advisor_report_file
 from mtgdeckbuilder.analysis.deck_rank import rank_decks_report_file
 from mtgdeckbuilder.build.deck_builder import build_deck_file
 from mtgdeckbuilder.eval.smoke import run_smoke_file
@@ -53,6 +54,13 @@ def _build_parser() -> argparse.ArgumentParser:
     smoke_parser.add_argument("--catalog", dest="catalog_path")
     smoke_parser.add_argument("--format", dest="format_name", default="standard")
     smoke_parser.set_defaults(func=_cmd_eval_smoke)
+
+    advisor_parser = subparsers.add_parser("advisor-report", help="write an offline advisor JSON report")
+    advisor_parser.add_argument("deck_path")
+    advisor_parser.add_argument("--catalog", dest="catalog_path", required=True)
+    advisor_parser.add_argument("--format", dest="format_name", default="standard")
+    advisor_parser.add_argument("--queue", default="bo1")
+    advisor_parser.set_defaults(func=_cmd_advisor_report)
 
     normalize_parser = subparsers.add_parser("normalize-cards", help="normalize an offline card catalog")
     normalize_parser.add_argument("source", help="source catalog type: scryfall or mtgjson")
@@ -135,6 +143,19 @@ def _cmd_eval_smoke(args: argparse.Namespace) -> int:
     )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0 if result.valid else 1
+
+
+def _cmd_advisor_report(args: argparse.Namespace) -> int:
+    print(
+        advisor_report_file(
+            args.deck_path,
+            args.catalog_path,
+            format_name=args.format_name,
+            queue=args.queue,
+        ),
+        end="",
+    )
+    return 0
 
 
 def _cmd_normalize_cards(args: argparse.Namespace) -> int:

@@ -26,7 +26,14 @@ def profile_csv_file(input_csv: str | Path) -> dict[str, Any]:
         header for header, count in Counter(normalized_headers).items() if header and count > 1
     )
     candidates = [_profile_candidate(profile, normalized_headers) for profile in list_profiles()]
-    candidates.sort(key=lambda item: (-item["matched_required_count"], item["missing_required_columns"], item["profile_id"]))
+    candidates.sort(
+        key=lambda item: (
+            -item["matched_required_count"],
+            item["missing_required_columns"],
+            -len(item["matched_optional_columns"]),
+            item["profile_id"],
+        )
+    )
     best = candidates[0] if candidates and not candidates[0]["missing_required_columns"] else None
     return {
         "schema_version": CSV_SCHEMA_VERSION,
@@ -83,7 +90,7 @@ def normalize_csv_rows(
     normalized_rows: list[dict[str, Any]] = []
     for row in rows:
         try:
-            normalized_rows.append(_normalize_row(profile, row))
+            normalized_rows.append(_normalize_row(profile, row, input_path=input_path))
         except ValueError as exc:
             skipped[str(exc)] += 1
     return {
@@ -194,7 +201,11 @@ def _profile_diagnostics(
     return diagnostics
 
 
-def _normalize_row(profile: SourceProfile, row: dict[str, str]) -> dict[str, Any]:
+def _normalize_row(
+    profile: SourceProfile,
+    row: dict[str, str],
+    input_path: str | None = None,
+) -> dict[str, Any]:
     normalized_headers = {_norm_header(header): header for header in row}
     aliases = _aliases(profile)
     output: dict[str, Any] = {}
@@ -205,11 +216,15 @@ def _normalize_row(profile: SourceProfile, row: dict[str, str]) -> dict[str, Any
             raise ValueError(f"missing_required_{field}")
         if value.strip() != "":
             output[field] = _coerce_field(field, value)
-    _apply_profile_defaults(profile, output)
+    _apply_profile_defaults(profile, output, input_path=input_path)
     return output
 
 
-def _apply_profile_defaults(profile: SourceProfile, output: dict[str, Any]) -> None:
+def _apply_profile_defaults(
+    profile: SourceProfile,
+    output: dict[str, Any],
+    input_path: str | None = None,
+) -> None:
     if profile.format and "format" not in output:
         output["format"] = profile.format
     if profile.queue and "queue" not in output:
@@ -218,6 +233,11 @@ def _apply_profile_defaults(profile: SourceProfile, output: dict[str, Any]) -> N
         output["rank_scope"] = profile.rank_scope
     if profile.event_type and "event_type" not in output:
         output["event_type"] = profile.event_type
+    if profile.profile_id == "steam_arena_deck_csv":
+        deck_name = Path(input_path).stem if input_path else "steam_arena_deck"
+        output.setdefault("deck_id", deck_name)
+        output.setdefault("deck_name", deck_name)
+        output.setdefault("section", "mainboard")
 
 
 def _aliases(profile: SourceProfile) -> dict[str, tuple[str, ...]]:
@@ -243,6 +263,8 @@ def _coerce_field(field: str, value: str) -> Any:
     text = value.strip()
     if field in {"quantity", "wins", "losses", "games", "placing"}:
         return int(float(text))
+    if field in {"mana_value"}:
+        return float(text)
     if field in {"winrate", "meta_share"}:
         return _parse_ratio(text)
     if field in {"colors", "color_identity"}:

@@ -139,6 +139,43 @@ PROFILES: dict[str, SourceProfile] = {
         queue="bo1",
         provenance_notes="Compatibility target for user-provided tracker/stat exports; no scraping or paywall bypassing.",
     ),
+    "steam_arena_deck_csv": SourceProfile(
+        profile_id="steam_arena_deck_csv",
+        source_name="Steam Arena Deck CSV",
+        source_url="https://github.com/clduab11/vawlrathh",
+        source_type="community_deck",
+        row_model="decks",
+        required_columns=("card_name", "quantity"),
+        optional_columns=(
+            "deck_id",
+            "deck_name",
+            "section",
+            "format",
+            "set_code",
+            "type_line",
+            "mana_cost",
+            "mana_value",
+            "colors",
+            "rarity",
+            "source_url",
+        ),
+        field_aliases={
+            "deck_id": ("deck_id", "deck id", "id"),
+            "deck_name": ("deck_name", "deck", "deck name"),
+            "card_name": ("name", "card", "card_name", "card name"),
+            "quantity": ("quantity", "count", "qty", "copies"),
+            "section": ("section", "board", "zone"),
+            "set_code": ("set", "set_code", "set code"),
+            "type_line": ("type", "type_line", "card_type", "card type"),
+            "mana_cost": ("mana cost", "mana_cost"),
+            "mana_value": ("cmc", "mana value", "mana_value", "mv"),
+            "colors": ("color", "colors"),
+        },
+        provenance_notes=(
+            "Compatibility target for user-provided Steam/Arena-style deck CSV exports; "
+            "modeled on the public vawlrathh prototype without importing its runtime stack."
+        ),
+    ),
     "aetherhub_like_deck": SourceProfile(
         profile_id="aetherhub_like_deck",
         source_name="AetherHub-like Arena Deck Export",

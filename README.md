@@ -80,8 +80,10 @@ The current implementation has no runtime dependencies and no advanced neural mo
 - Embed normalization metadata and diagnostics in normalized card catalogs.
 - Print human-readable catalog normalization reports.
 - Profile and normalize user-provided CSV exports from Arena-adjacent source shapes.
+- Normalize user-provided Steam/Arena-style deck CSV exports inspired by the `vawlrathh` prototype.
 - Rank decks from local BO1/BO3 performance CSVs with sample-size guardrails.
 - Build conservative Arena-ready deck candidates from validated local evidence.
+- Generate deterministic offline advisor reports from local deck and catalog data.
 - Run a smoke evaluator that parses, validates, featureizes, and exports a deck.
 
 ## Quick Start
@@ -126,6 +128,16 @@ python3 -m mtgdeckbuilder eval-smoke \
   --catalog data/processed/sample_cards.json
 ```
 
+Generate an offline advisor report:
+
+```bash
+python3 -m mtgdeckbuilder advisor-report \
+  data/raw/sample_arena_deck.txt \
+  --catalog data/processed/sample_cards.json \
+  --format standard \
+  --queue bo1
+```
+
 Normalize already-downloaded Scryfall bulk-style data:
 
 ```bash
@@ -168,6 +180,16 @@ python3 -m mtgdeckbuilder csv-normalize \
 python3 -m mtgdeckbuilder csv-report data/processed/results.json
 ```
 
+Normalize a Steam/Arena-style deck CSV:
+
+```bash
+python3 -m mtgdeckbuilder csv-profile tests/fixtures/csv/steam_arena_deck.csv
+python3 -m mtgdeckbuilder csv-normalize \
+  steam_arena_deck_csv \
+  tests/fixtures/csv/steam_arena_deck.csv \
+  data/processed/steam_deck.json
+```
+
 Rank decks from local performance data:
 
 ```bash
@@ -196,12 +218,21 @@ Current source profile targets:
 - `untapped_like_csv`: Untapped.gg-style tracker/stat exports with wins, losses, rank scope, queue, and BO1/BO3 segmentation.
 - `aetherhub_like_deck`: AetherHub-style Arena deck rows with card counts and deck sections.
 - `mtggoldfish_like_metagame`: MTGGoldfish-style metagame rows with archetype and metagame share.
+- `steam_arena_deck_csv`: Steam/Arena-style deck CSV rows with quantity, name, set, type, mana cost, CMC, colors, and rarity.
 - `generic_card_csv`: card catalog spreadsheets.
 - `generic_collection_csv`: owned-card collection exports.
 - `generic_deck_csv`: generic deck rows.
 - `generic_match_results_csv`: generic performance rows.
 
 Future adapters can cover MTGDecks, MTGAZone, MTG Arena Pro, 17Lands, Moxfield, Archidekt, and CSV fixtures from GitHub, GitLab, or Bitbucket. Tests should stay fixture-only and network-free.
+
+## Vawlrathh Reference Path
+
+[`clduab11/vawlrathh`](https://github.com/clduab11/vawlrathh) is a separate public AGPL prototype for an MCP-powered Arena advisor. This repo uses it as a reference for future advisor, Steam CSV, MCP, and app-layer ideas, not as a dependency.
+
+Useful ideas from that prototype include deck-analysis tool shapes, Steam/Arena CSV examples, advisor-style reports, and possible future MCP or app interfaces. The clean offline core intentionally excludes the prototype's heavy runtime stack: FastAPI, Gradio, databases, OpenAI/Anthropic clients, embeddings, Torch, live Scryfall calls, live metagame lookups, and personality branding.
+
+The current `advisor-report` command is the first narrow bridge. It is deterministic, local-only, and evidence-labeled. It does not make AI calls, fetch network data, control Arena, or claim predicted win-rate improvements.
 
 ## Data Model
 
@@ -261,6 +292,7 @@ The code is organized as a Python `src/` package:
 - `mtgdeckbuilder.ingest`: Arena deck parser, card models, and catalog normalization.
 - `mtgdeckbuilder.sources`: source profiles plus CSV profiling and normalization.
 - `mtgdeckbuilder.analysis`: offline deck performance aggregation.
+- `mtgdeckbuilder.advisor`: deterministic offline advisor reports.
 - `mtgdeckbuilder.build`: conservative evidence-backed deck candidate construction.
 - `mtgdeckbuilder.rules`: deterministic deck validator.
 - `mtgdeckbuilder.features`: basic offline feature extraction.
