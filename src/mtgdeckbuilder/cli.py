@@ -7,12 +7,16 @@ import json
 from pathlib import Path
 import sys
 
+from mtgdeckbuilder.analysis.deck_rank import rank_decks_report_file
+from mtgdeckbuilder.build.deck_builder import build_deck_file
 from mtgdeckbuilder.eval.smoke import run_smoke_file
 from mtgdeckbuilder.export.arena import export_arena_deck
 from mtgdeckbuilder.ingest.arena import ArenaParseError, parse_arena_deck
 from mtgdeckbuilder.ingest.cards import CardCatalog
 from mtgdeckbuilder.ingest.normalization import normalize_cards_file, normalization_report_file
 from mtgdeckbuilder.rules.validator import ValidationConfig, validate_deck
+from mtgdeckbuilder.sources.csv_ingest import csv_report_file, normalize_csv_file, profile_csv_report
+from mtgdeckbuilder.sources.profiles import profile_json, profiles_json
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -58,6 +62,42 @@ def _build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument("normalized_catalog_json")
     report_parser.set_defaults(func=_cmd_normalize_report)
 
+    source_parser = subparsers.add_parser("source-profile", help="list or inspect source profiles")
+    source_subparsers = source_parser.add_subparsers(dest="source_profile_command", required=True)
+    source_list_parser = source_subparsers.add_parser("list", help="list known source profiles")
+    source_list_parser.set_defaults(func=_cmd_source_profile_list)
+    source_inspect_parser = source_subparsers.add_parser("inspect", help="inspect one source profile")
+    source_inspect_parser.add_argument("profile")
+    source_inspect_parser.set_defaults(func=_cmd_source_profile_inspect)
+
+    csv_profile_parser = subparsers.add_parser("csv-profile", help="profile a local CSV export")
+    csv_profile_parser.add_argument("input_csv")
+    csv_profile_parser.set_defaults(func=_cmd_csv_profile)
+
+    csv_normalize_parser = subparsers.add_parser("csv-normalize", help="normalize a local CSV export")
+    csv_normalize_parser.add_argument("profile")
+    csv_normalize_parser.add_argument("input_csv")
+    csv_normalize_parser.add_argument("output_json")
+    csv_normalize_parser.set_defaults(func=_cmd_csv_normalize)
+
+    csv_report_parser = subparsers.add_parser("csv-report", help="print normalized CSV diagnostics")
+    csv_report_parser.add_argument("normalized_json")
+    csv_report_parser.set_defaults(func=_cmd_csv_report)
+
+    rank_parser = subparsers.add_parser("deck-rank", help="rank decks from normalized match results")
+    rank_parser.add_argument("normalized_results_json")
+    rank_parser.add_argument("--min-games", type=int, default=30)
+    rank_parser.set_defaults(func=_cmd_deck_rank)
+
+    build_parser = subparsers.add_parser("deck-build", help="build an evidence-backed validated deck candidate")
+    build_parser.add_argument("--cards", required=True)
+    build_parser.add_argument("--results", required=True)
+    build_parser.add_argument("--collection")
+    build_parser.add_argument("--format", dest="format_name", default="standard")
+    build_parser.add_argument("--queue", default="bo1")
+    build_parser.add_argument("--min-games", type=int, default=30)
+    build_parser.set_defaults(func=_cmd_deck_build)
+
     return parser
 
 
@@ -101,4 +141,50 @@ def _cmd_normalize_cards(args: argparse.Namespace) -> int:
 
 def _cmd_normalize_report(args: argparse.Namespace) -> int:
     print(normalization_report_file(args.normalized_catalog_json), end="")
+    return 0
+
+
+def _cmd_source_profile_list(args: argparse.Namespace) -> int:
+    print(profiles_json(), end="")
+    return 0
+
+
+def _cmd_source_profile_inspect(args: argparse.Namespace) -> int:
+    print(profile_json(args.profile), end="")
+    return 0
+
+
+def _cmd_csv_profile(args: argparse.Namespace) -> int:
+    print(profile_csv_report(args.input_csv), end="")
+    return 0
+
+
+def _cmd_csv_normalize(args: argparse.Namespace) -> int:
+    count = normalize_csv_file(args.profile, args.input_csv, args.output_json)
+    print(f"normalized {count} rows to {args.output_json}")
+    return 0
+
+
+def _cmd_csv_report(args: argparse.Namespace) -> int:
+    print(csv_report_file(args.normalized_json), end="")
+    return 0
+
+
+def _cmd_deck_rank(args: argparse.Namespace) -> int:
+    print(rank_decks_report_file(args.normalized_results_json, min_games=args.min_games), end="")
+    return 0
+
+
+def _cmd_deck_build(args: argparse.Namespace) -> int:
+    print(
+        build_deck_file(
+            cards_path=args.cards,
+            collection_path=args.collection,
+            results_path=args.results,
+            format_name=args.format_name,
+            queue=args.queue,
+            min_games=args.min_games,
+        ),
+        end="",
+    )
     return 0
