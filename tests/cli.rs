@@ -37,7 +37,7 @@ fn cli_export_matches_fixture_golden() {
 }
 
 #[test]
-fn cli_simulate_opening_is_seeded_and_truthful() {
+fn cli_simulate_opening_reports_seeded_chacha_metrics() {
     let output = Command::cargo_bin("mtgdeckbuilder")
         .unwrap()
         .args([
@@ -58,6 +58,8 @@ fn cli_simulate_opening_is_seeded_and_truthful() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("\"keepable_7_rate\": 0.98"));
+    assert!(stdout.contains("\"screw_risk_opening_rate\": 0.06"));
     assert!(stdout.contains("\"seed\": 42"));
     assert!(stdout.contains("\"trials\": 50"));
     assert!(stdout.contains("Opening-hand quality is not match win rate."));

@@ -199,43 +199,61 @@ fn deck_features_match_fixture_golden() {
 }
 
 #[test]
-fn seeded_simulations_are_reproducible() {
+fn seeded_simulations_use_stable_chacha_metrics() {
     let db = CardDatabase::from_scryfall_file(CARDS).unwrap();
     let deck = parse_arena_decklist_file(DECK).unwrap();
 
     let opening = simulate_opening_hands(&deck, &db, "arena_n2", 50, 42, 2).unwrap();
     let opening_repeat = simulate_opening_hands(&deck, &db, "arena_n2", 50, 42, 2).unwrap();
+    assert_eq!(opening.metrics, opening_repeat.metrics);
     assert_eq!(
         serde_json::to_value(&opening).unwrap(),
-        serde_json::to_value(&opening_repeat).unwrap()
-    );
-    assert_eq!(opening.seed, 42);
-    assert_eq!(opening.trials, 50);
-    assert!(
-        opening
-            .assumptions
-            .iter()
-            .any(|assumption| assumption
-                .contains("exact MTG Arena Bo1 hand smoothing is not public"))
+        json!({
+          "assumptions": [
+            "Opening-hand quality is not match win rate.",
+            "Arena-like approximation; exact MTG Arena Bo1 hand smoothing is not public."
+          ],
+          "metrics": {
+            "flood_risk_opening_rate": 0.0,
+            "has_threat_rate": 1.0,
+            "keepable_7_rate": 0.98,
+            "low_quality_forced_keep_rate": 0.0,
+            "mulligan_to_5_rate": 0.0,
+            "mulligan_to_6_rate": 0.02,
+            "no_primary_source_rate": 0.0,
+            "screw_risk_opening_rate": 0.06,
+            "turn_1_or_2_play_rate": 1.0
+          },
+          "mode": "arena_n2",
+          "seed": 42,
+          "trials": 50
+        })
     );
 
     let early = simulate_first_three_turns(&deck, &db, 50, 42).unwrap();
     let early_repeat = simulate_first_three_turns(&deck, &db, 50, 42).unwrap();
+    assert_eq!(early.metrics, early_repeat.metrics);
     assert_eq!(
         serde_json::to_value(&early).unwrap(),
-        serde_json::to_value(&early_repeat).unwrap()
+        json!({
+          "assumptions": [
+            "Deterministic sequencing heuristic; not a gameplay simulator and not a match win-rate model."
+          ],
+          "metrics": {
+            "did_nothing_by_turn_3_rate": 0.0,
+            "missed_land_drop_before_turn_3_rate": 0.16,
+            "threat_by_turn_3_rate": 0.82,
+            "turn_2_plan_online_rate": 0.98,
+            "turn_3_plan_online_rate": 0.98
+          },
+          "seed": 42,
+          "trials": 50
+        })
     );
-    assert_eq!(early.seed, 42);
-    assert_eq!(early.trials, 50);
 
-    let consistency = score_consistency(&opening, &early);
-    assert!(
-        consistency
-            .get("consistency_score")
-            .unwrap()
-            .as_f64()
-            .unwrap()
-            >= 0.0
+    assert_eq!(
+        score_consistency(&opening, &early),
+        json!({"consistency_score": 0.96})
     );
 }
 

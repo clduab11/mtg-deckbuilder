@@ -3,19 +3,19 @@ use crate::ingest::card_database::CardDatabase;
 use crate::sim::arena_like_smoother::{score_candidate_hand, select_arena_like_hand};
 use anyhow::{Result, anyhow};
 use rand::{RngExt, SeedableRng};
-use rand_chacha::ChaCha8Rng;
+use rand_chacha::ChaCha20Rng;
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub struct SeededRng {
-    rng: ChaCha8Rng,
+    rng: ChaCha20Rng,
 }
 
 impl SeededRng {
     pub fn new(seed: u64) -> Self {
         Self {
-            rng: ChaCha8Rng::seed_from_u64(seed),
+            rng: ChaCha20Rng::seed_from_u64(seed),
         }
     }
 

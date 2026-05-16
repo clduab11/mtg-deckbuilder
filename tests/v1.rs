@@ -23,6 +23,68 @@ fn catalog_loads_csv_json_jsonl_and_yaml() {
 }
 
 #[test]
+fn catalog_csv_maps_optional_card_metadata() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("catalog.csv");
+    std::fs::write(
+        &path,
+        "Name,Type,Keywords,Games,Legalities,Arena ID,Digital,Rebalanced,standard\n\
+         Test Spell,Instant,Double strike;Flying,\"arena,paper\",explorer:legal;historic:not_legal,123,true,yes,legal\n",
+    )
+    .unwrap();
+
+    let loaded = load_catalog(&path, Some("csv")).unwrap();
+    let card = loaded.database.get("Test Spell").unwrap();
+    assert_eq!(card.keywords, vec!["Double strike", "Flying"]);
+    assert_eq!(card.games, vec!["arena", "paper"]);
+    assert_eq!(
+        card.legalities.get("explorer").map(String::as_str),
+        Some("legal")
+    );
+    assert_eq!(
+        card.legalities.get("historic").map(String::as_str),
+        Some("not_legal")
+    );
+    assert_eq!(
+        card.legalities.get("standard").map(String::as_str),
+        Some("legal")
+    );
+    assert_eq!(card.arena_id, Some(123));
+    assert!(card.is_digital);
+    assert!(card.is_rebalanced);
+}
+
+#[test]
+fn catalog_rejects_unknown_json_and_yaml_schema_versions() {
+    let dir = tempfile::tempdir().unwrap();
+    let json_path = dir.path().join("catalog.json");
+    std::fs::write(
+        &json_path,
+        r#"{"schema_version":"catalog.v2","cards":[{"name":"Test Spell"}]}"#,
+    )
+    .unwrap();
+    let json_error = load_catalog(&json_path, Some("json")).unwrap_err();
+    assert!(
+        json_error
+            .to_string()
+            .contains("Unsupported catalog schema_version")
+    );
+
+    let yaml_path = dir.path().join("catalog.yaml");
+    std::fs::write(
+        &yaml_path,
+        "schema_version: catalog.v2\ncards:\n  - name: Test Spell\n",
+    )
+    .unwrap();
+    let yaml_error = load_catalog(&yaml_path, Some("yaml")).unwrap_err();
+    assert!(
+        yaml_error
+            .to_string()
+            .contains("Unsupported catalog schema_version")
+    );
+}
+
+#[test]
 fn bo_configs_state_oriented_assumptions() {
     let bo1 = Bo1Config::default();
     assert_eq!(bo1.sideboard_slots_available, 7);

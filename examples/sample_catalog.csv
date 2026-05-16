@@ -1,4 +1,4 @@
-Name,Set,Type,Mana Cost,CMC,Colors,Rarity
-Forest,TST,Basic Land,,0,,common
-Test Bear,TST,Creature - Bear,{1}{G},2,G,common
-Test Trick,TST,Instant,{G},1,G,common
+Quantity,Name,Set,Type,Mana Cost,CMC,Colors,Rarity
+24,Forest,TST,Basic Land,,0,,common
+4,Test Bear,TST,Creature - Bear,{1}{G},2,G,common
+4,Test Trick,TST,Instant,{G},1,G,common

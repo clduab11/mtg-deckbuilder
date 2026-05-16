@@ -3,9 +3,10 @@ use crate::core::normalization::is_basic_land_name;
 use crate::ingest::card_database::CardDatabase;
 use anyhow::{Result, anyhow};
 use schemars::{JsonSchema, schema_for};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
@@ -22,31 +23,36 @@ fn default_catalog_schema() -> String {
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, Serialize)]
 pub struct CatalogCardRecord {
-    #[serde(alias = "Name", alias = "card_name")]
+    #[serde(alias = "Name", alias = "card_name", alias = "Card Name")]
     pub name: String,
     #[serde(default, alias = "Mana Cost", alias = "manaCost")]
     pub mana_cost: String,
     #[serde(default, alias = "CMC", alias = "cmc", alias = "manaValue")]
     pub mana_value: f64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_symbol_list")]
     pub colors: Vec<String>,
-    #[serde(default, alias = "colorIdentity")]
+    #[serde(
+        default,
+        alias = "colorIdentity",
+        alias = "Color Identity",
+        deserialize_with = "deserialize_symbol_list"
+    )]
     pub color_identity: Vec<String>,
-    #[serde(default, alias = "Type", alias = "type")]
+    #[serde(default, alias = "Type", alias = "type", alias = "typeLine")]
     pub type_line: String,
     #[serde(default, alias = "oracleText")]
     pub oracle_text: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_symbol_list")]
     pub keywords: Vec<String>,
     #[serde(default, alias = "Rarity")]
     pub rarity: String,
-    #[serde(default, alias = "Set", alias = "set")]
+    #[serde(default, alias = "Set", alias = "set", alias = "setCode")]
     pub set_code: String,
-    #[serde(default, alias = "collectorNumber")]
+    #[serde(default, alias = "collectorNumber", alias = "Number")]
     pub collector_number: String,
     #[serde(default)]
     pub legalities: BTreeMap<String, String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_symbol_list")]
     pub games: Vec<String>,
     #[serde(default)]
     pub arena_id: Option<i64>,
@@ -75,7 +81,7 @@ pub struct LoadedCatalog {
 
 impl CatalogCardRecord {
     pub fn into_card(self) -> Card {
-        let type_line = if self.type_line.is_empty() {
+        let type_line = if self.type_line.trim().is_empty() {
             "Unknown".to_string()
         } else {
             self.type_line
@@ -92,7 +98,7 @@ impl CatalogCardRecord {
             type_line,
             oracle_text: self.oracle_text,
             keywords: self.keywords,
-            rarity: if self.rarity.is_empty() {
+            rarity: if self.rarity.trim().is_empty() {
                 "common".to_string()
             } else {
                 self.rarity.to_lowercase()
@@ -113,6 +119,21 @@ impl CatalogCardRecord {
     }
 }
 
+fn deserialize_symbol_list<'de, D>(deserializer: D) -> std::result::Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    Ok(match value {
+        Value::Array(items) => items
+            .into_iter()
+            .filter_map(|item| item.as_str().map(str::to_string))
+            .collect(),
+        Value::String(item) => vec![item],
+        _ => Vec::new(),
+    })
+}
+
 fn normalize_symbols(values: Vec<String>) -> Vec<String> {
     values
         .into_iter()
@@ -124,6 +145,16 @@ fn normalize_symbols(values: Vec<String>) -> Vec<String> {
                 .collect::<Vec<_>>()
         })
         .collect()
+}
+
+fn ensure_catalog_v1(schema_version: &str) -> Result<()> {
+    if schema_version == "catalog.v1" {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Unsupported catalog schema_version {schema_version:?}; expected \"catalog.v1\""
+        ))
+    }
 }
 
 fn format_from_path(path: &Path, explicit: Option<&str>) -> Result<String> {
@@ -196,16 +227,13 @@ fn load_json_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>>
     let value: Value = serde_json::from_str(&text)?;
     if value.get("schema_version").is_some() && value.get("cards").is_some() {
         let document: CatalogDocument = serde_json::from_value(value)?;
+        ensure_catalog_v1(&document.schema_version)?;
         return Ok(from_records(document.cards, warnings));
     }
     if value.get("data").and_then(Value::as_array).is_some()
-        || value.as_array().is_some_and(|items| {
-            items
-                .first()
-                .and_then(|item| item.get("object"))
-                .and_then(Value::as_str)
-                .is_some()
-        })
+        || value
+            .as_array()
+            .is_some_and(|items| looks_like_scryfall(items.first()))
     {
         return crate::ingest::scryfall_loader::load_scryfall_cards(path);
     }
@@ -218,19 +246,31 @@ fn load_json_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>>
     }
     if value.get("cards").is_some() {
         let document: CatalogDocument = serde_json::from_value(value)?;
+        ensure_catalog_v1(&document.schema_version)?;
         return Ok(from_records(document.cards, warnings));
     }
     let records: Vec<CatalogCardRecord> = serde_json::from_value(value)?;
     Ok(from_records(records, warnings))
 }
 
+fn looks_like_scryfall(value: Option<&Value>) -> bool {
+    value.is_some_and(|item| {
+        item.get("object").is_some()
+            || item.get("cmc").is_some()
+            || item.get("collector_number").is_some()
+            || item.get("card_faces").is_some()
+    })
+}
+
 fn load_jsonl_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>> {
     let mut records = Vec::new();
-    for (idx, line) in std::fs::read_to_string(path)?.lines().enumerate() {
+    let file = std::fs::File::open(path)?;
+    for (idx, line) in BufReader::new(file).lines().enumerate() {
+        let line = line?;
         if line.trim().is_empty() {
             continue;
         }
-        let record: CatalogCardRecord = serde_json::from_str(line)
+        let record: CatalogCardRecord = serde_json::from_str(&line)
             .map_err(|error| anyhow!("JSONL line {}: {error}", idx + 1))?;
         records.push(record);
     }
@@ -239,8 +279,54 @@ fn load_jsonl_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>
 
 fn load_yaml_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>> {
     let text = std::fs::read_to_string(path)?;
-    let document: CatalogDocument = serde_yaml::from_str(&text)?;
+    let document: CatalogDocument = serde_yml::from_str(&text)?;
+    ensure_catalog_v1(&document.schema_version)?;
     Ok(from_records(document.cards, warnings))
+}
+
+fn parse_bool(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "y"
+    )
+}
+
+fn parse_i64_option(value: &str) -> Option<i64> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        trimmed.parse::<i64>().ok()
+    }
+}
+
+fn parse_csv_list(value: &str) -> Vec<String> {
+    value
+        .split(['|', ';', ','])
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn parse_legalities(value: &str) -> BTreeMap<String, String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return BTreeMap::new();
+    }
+    if let Ok(map) = serde_json::from_str::<BTreeMap<String, String>>(trimmed) {
+        return map;
+    }
+
+    trimmed
+        .split([';', ','])
+        .filter_map(|part| {
+            let (format, status) = part.split_once(':').or_else(|| part.split_once('='))?;
+            let format = format.trim().to_ascii_lowercase();
+            let status = status.trim().to_ascii_lowercase();
+            (!format.is_empty() && !status.is_empty()).then_some((format, status))
+        })
+        .collect()
 }
 
 fn load_csv_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>> {
@@ -268,6 +354,28 @@ fn load_csv_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>> 
             warnings.push(format!("CSV row {} skipped: missing card name", idx + 1));
             continue;
         }
+        let mut legalities = parse_legalities(&get(&["legalities", "Legalities"]));
+        for format in [
+            "standard",
+            "alchemy",
+            "historic",
+            "explorer",
+            "pioneer",
+            "modern",
+            "legacy",
+            "vintage",
+            "commander",
+            "brawl",
+        ] {
+            let value = get(&[
+                format,
+                &format!("legal_{format}"),
+                &format!("legality_{format}"),
+            ]);
+            if !value.is_empty() {
+                legalities.insert(format.to_string(), value.to_ascii_lowercase());
+            }
+        }
         records.push(CatalogCardRecord {
             name,
             mana_cost: get(&["mana_cost", "Mana Cost", "manaCost"]),
@@ -276,13 +384,25 @@ fn load_csv_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>> 
                 .unwrap_or(0.0),
             colors: normalize_symbols(vec![get(&["colors", "Colors"])]),
             color_identity: normalize_symbols(vec![get(&["color_identity", "Color Identity"])]),
-            type_line: get(&["type_line", "Type", "type"]),
-            oracle_text: get(&["oracle_text", "Oracle Text"]),
-            keywords: normalize_symbols(vec![get(&["keywords", "Keywords"])]),
+            type_line: get(&["type_line", "Type", "type", "typeLine"]),
+            oracle_text: get(&["oracle_text", "Oracle Text", "oracleText"]),
+            keywords: parse_csv_list(&get(&["keywords", "Keywords"])),
             rarity: get(&["rarity", "Rarity"]),
-            set_code: get(&["set_code", "set", "Set"]),
+            set_code: get(&["set_code", "set", "Set", "setCode"]),
             collector_number: get(&["collector_number", "collectorNumber", "Number"]),
-            games: normalize_symbols(vec![get(&["games", "Games"])]),
+            legalities,
+            games: parse_csv_list(&get(&["games", "Games"]))
+                .into_iter()
+                .map(|game| game.to_ascii_lowercase())
+                .collect(),
+            arena_id: parse_i64_option(&get(&["arena_id", "Arena ID", "arenaId"])),
+            is_digital: parse_bool(&get(&["is_digital", "digital", "Digital", "isDigital"])),
+            is_rebalanced: parse_bool(&get(&[
+                "is_rebalanced",
+                "rebalanced",
+                "Rebalanced",
+                "isRebalanced",
+            ])),
             ..CatalogCardRecord::default()
         });
     }
