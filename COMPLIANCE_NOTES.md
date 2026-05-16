@@ -12,6 +12,7 @@ This repository is an unofficial fan/project tool. It is not affiliated with, en
 - Current legality, bans, restrictions, card text, Arena availability, and format state must come from current authoritative data supplied by the user or lawful public sources.
 - MTG Arena is available on Steam as a free-to-play official client with in-app purchases and a third-party Wizards account/EULA. This repo must not imply official affiliation, Steam integration, payment integration, account sync, or client control. Sources: [Steam listing](https://store.steampowered.com/app/2141910/Magic_The_Gathering_Arena/) and [Wizards Store/Purchases FAQ](https://mtgarena-support.wizards.com/hc/en-us/articles/115004569623-Store-Purchases-and-Collection-FAQ).
 - Wizards documents local support-log locations, including Steam paths. That is evidence that local logs exist, not permission for this repo to tail logs, auto-discover client paths, parse proprietary client state, or operate as a live tracker. Source: [Creating Log Files on PC/Mac/Steam](https://mtgarena-support.wizards.com/hc/en-us/articles/360000726823-Creating-Log-Files-on-PC-Mac-Steam).
+- Third-party deployment or app-builder tools may host original software only after privacy, terms, payment, and trademark review. They must not introduce Wizards account sync, client automation, protected data access, or misleading sponsorship claims.
 
 ## Local Web Workbench Boundary
 
@@ -33,4 +34,4 @@ This repository is an unofficial fan/project tool. It is not affiliated with, en
 
 ## Monetization Boundary
 
-The open source engine can support paid hosting, dashboards, API access, creator exports, and team workspaces around original software and user-supplied data. Monetization must not sell Wizards IP as gated fan content without appropriate permission.
+The open source engine can support paid hosting, dashboards, API access, creator exports, and team workspaces around original software and user-supplied data. Monetization must not sell Wizards IP as gated fan content without appropriate permission. Any paid tier must be reviewed separately from the fan-content layer and must not monetize Wizards IP, Arena account data, client-derived protected data, or official-looking branding.

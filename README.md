@@ -2,7 +2,7 @@
 
 ## What This Is
 
-`mtg-deckbuilder` is a Rust-first, offline MTG Arena-oriented deck validation, ingestion, simulation, statistics, and reporting engine. It works from user-supplied card catalogs, decklists, collection files, and result records.
+`mtg-deckbuilder` is a Rust-first, offline Magic deck analysis engine with Arena-style import/export conventions, validation, ingestion, simulation, statistics, and reporting. It works from user-supplied card catalogs, decklists, collection files, and result records.
 
 It is not an MTG Arena client, overlay, tracker, bot, or exact gameplay simulator.
 
@@ -16,7 +16,7 @@ Most MTG deck tools sell convenience around overlays, collection sync, pricing, 
 - Collection CSV parsing with conservative ownership detection.
 - Local card catalog loading from Scryfall-like JSON, MTGJSON-like JSON, generic CSV, generic JSON, JSONL, and YAML.
 - Local `result-log.v1` loading from user-supplied CSV, JSON, and JSONL match/draft records.
-- Format-aware validation hooks for copy limits, sideboards, ownership, wildcards, bans, legalities, and Arena compatibility.
+- Format-aware validation hooks for copy limits, sideboards, ownership, wildcards, bans, legalities, and Arena-style deck-format checks from supplied catalog data.
 - Seeded opening-hand and first-three-turn simulation proxies.
 - Bo1/Bo3-oriented simulation configs with explicit assumptions.
 - Constructed and draft metric primitives, including Wilson confidence intervals and sample-size warnings.
@@ -50,7 +50,7 @@ src/
 
 Supported catalog inputs:
 
-- CSV: generic card rows and Steam/Arena-style aliases such as `Quantity,Name,Set,Type,Mana Cost,CMC,Colors,Rarity`.
+- CSV: generic card rows and user-provided Arena-style CSV aliases such as `Quantity,Name,Set,Type,Mana Cost,CMC,Colors,Rarity`.
 - JSON: Scryfall-like, MTGJSON-like, or `catalog.v1`.
 - JSONL: one `catalog.v1` card record per line.
 - YAML: `catalog.v1` document.
@@ -140,11 +140,28 @@ The workbench processes pasted or uploaded text in memory through the Rust serve
 
 It does not control MTG Arena, watch logs, access a Steam or Wizards account, scrape clients, run overlays, or provide a hosted service.
 
+### Workbench Preview
+
+These screenshots are generated from local sample/dev fixtures. They do not bundle Wizards logos, card art, proprietary game data, private account data, or Steam/MTG Arena client state, and they do not show or interact with MTG Arena, Steam, Wizards accounts, logs, overlays, or client state.
+
+<p>
+  <img src="docs/assets/workbench/desktop-success-result-log-1440x900.png" alt="Desktop workbench success state with validation, simulation, result-log metrics, hashes, and export controls" width="760">
+</p>
+
+<p>
+  <img src="docs/assets/workbench/desktop-report-replay-1440x900.png" alt="Desktop report replay state rendering an existing analysis-report.v1 artifact" width="370">
+  <img src="docs/assets/workbench/desktop-invalid-input-1440x900.png" alt="Desktop invalid input state with validation issues" width="370">
+</p>
+
+<p>
+  <img src="docs/assets/workbench/mobile-success-390x844.png" alt="Mobile workbench success state" width="220">
+</p>
+
 ## Simulation Model
 
 The simulator is Bo1/Bo3-oriented, not exact MTG Arena parity.
 
-- Bo1 uses an Arena-like opening-hand approximation and a 7-card accessible sideboard assumption.
+- Bo1 uses an Arena-inspired opening-hand approximation based on explicit assumptions, not reverse-engineered client behavior, and a 7-card accessible sideboard assumption.
 - Bo3 uses paper-random opening sampling and a 15-card sideboard assumption.
 - Both modes use seeded `rand_chacha::ChaCha20Rng` reproducibility.
 - Current outputs are opening-hand and early-turn quality proxies, not gameplay resolution or match win-rate truth.
@@ -206,7 +223,27 @@ The route constants still describe future durable API contracts for:
 - `GET /simulation/{id}/report`
 - `POST /export`
 
-This repo does not currently ship a hosted API, account system, shared report store, or paid dashboard.
+This repo does not currently ship a hosted API, account system, shared report store, or paid dashboard. Future adapters may be deployed with third-party hosting/build tools, but this repo does not ship a Vercel or Lovable.dev integration, endorsement, hosted service, payment flow, or account sync.
+
+## Hosted / Lovable Conversion Path
+
+The current app is a local Rust/Axum workbench. It is not yet a Vercel-hosted app, Lovable project, or account-backed dashboard.
+
+A future hosted product should keep the Rust engine as the source of truth and treat browser-builder work as a UX/product layer around explicit user-owned data. Current platform docs support a conservative path:
+
+- [Vercel deployments](https://vercel.com/docs/deployments) can be created from Git, Vercel CLI, deploy hooks, or the REST API.
+- [Vercel Git deployments](https://vercel.com/docs/git) can produce preview deployments from branch pushes and production deployments from the configured production branch.
+- [Lovable GitHub integration](https://docs.lovable.dev/integrations/github) supports syncing a Lovable project with GitHub for backup, collaboration, local editing, and deployment elsewhere.
+- [Lovable deployment and ownership docs](https://docs.lovable.dev/tips-tricks/deployment-hosting-ownership) describe Lovable apps as portable Vite/React projects that can be hosted on managed platforms including Vercel.
+
+Practical conversion options:
+
+- Keep this repo canonical and extract the static workbench into a Vite/React front end that calls a Rust service adapter.
+- Use Lovable as a prototype surface for hosted dashboard workflows, then port only reviewed UI/product ideas back into this repo.
+- Use Vercel preview deployments for hosted experiments after adding a web build target and privacy-safe API adapter.
+- Defer accounts, shared report storage, paid dashboards, report sharing, and payment flows until privacy, Wizards policy, trademark, data-retention, and monetization reviews are complete.
+
+The hosted path must preserve the current exclusions: no MTG Arena client automation, Steam automation, account login/sync, overlays, live log watching, scraping, protected APIs, reverse engineering, or gameplay automation.
 
 ## Monetization / Product Direction
 
@@ -215,14 +252,16 @@ Research notes in `RESEARCH_NOTES.md` compare public positioning from Untapped.g
 This repo can differentiate through:
 
 - free open-source CLI and deterministic engine
-- hosted paid simulation runs
-- pro dashboard subscription over user-owned data
-- draft-analysis premium tier
-- team testing workspace
-- API access for creators and data users
+- hosted compute for deterministic simulation jobs
+- private storage for user-owned reports and presets
+- collaboration workspaces for testing teams
+- API access around original analysis outputs
+- original draft and constructed analytics over user-supplied data
 - report exports for content creators
 
 Commercial layers must respect Wizards IP, fan content, trademark, and terms boundaries.
+
+Potential commercial layers should charge for compute, storage, collaboration, API access, and original analytics over user-supplied data, not for access to Wizards-owned card images, logos, game assets, official-looking branding, Arena account data, client-derived protected data, or gated fan content.
 
 ## Verification
 
