@@ -110,7 +110,7 @@ The simulator is Bo1/Bo3-oriented, not exact MTG Arena parity.
 
 - Bo1 uses an Arena-like opening-hand approximation and a 7-card accessible sideboard assumption.
 - Bo3 uses paper-random opening sampling and a 15-card sideboard assumption.
-- Both modes use seeded `rand_chacha::ChaCha8Rng` reproducibility.
+- Both modes use seeded `rand_chacha::ChaCha20Rng` reproducibility.
 - Current outputs are opening-hand and early-turn quality proxies, not gameplay resolution or match win-rate truth.
 
 ## Constructed Metrics
