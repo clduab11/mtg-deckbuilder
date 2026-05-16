@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mtg-deckbuilder local workbench</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>mtg-deckbuilder</h1>
+          <p>Local workbench</p>
+        </div>
+        <div class="run-controls" aria-label="Analysis controls">
+          <label>
+            <span>Format</span>
+            <select id="formatName">
+              <option value="standard">standard</option>
+              <option value="alchemy">alchemy</option>
+              <option value="historic">historic</option>
+              <option value="explorer">explorer</option>
+              <option value="timeless">timeless</option>
+            </select>
+          </label>
+          <label>
+            <span>Queue</span>
+            <select id="queue">
+              <option value="bo1">bo1</option>
+              <option value="bo3">bo3</option>
+            </select>
+          </label>
+          <label>
+            <span>Trials</span>
+            <input id="trials" type="number" min="1" step="1" value="250" />
+          </label>
+          <label>
+            <span>Seed</span>
+            <input id="seed" type="number" min="0" step="1" value="42" />
+          </label>
+        </div>
+      </header>
+
+      <main class="workbench">
+        <section class="input-pane" aria-label="Inputs">
+          <div class="pane-head">
+            <div>
+              <h2>Inputs</h2>
+              <p id="inputStatus">Add a decklist and catalog to begin.</p>
+            </div>
+            <button id="loadSample" type="button" class="secondary">Load sample fixture</button>
+          </div>
+
+          <div class="field">
+            <div class="label-row">
+              <label for="deckText">Decklist</label>
+              <input id="deckFile" type="file" accept=".txt,.dek,.dec" />
+            </div>
+            <p>Paste an Arena-style decklist or choose a local text file.</p>
+            <textarea id="deckText" spellcheck="false" placeholder="Deck&#10;24 Forest&#10;4 Test Bear"></textarea>
+          </div>
+
+          <div class="field">
+            <div class="label-row">
+              <label for="catalogText">Catalog file or pasted catalog</label>
+              <input id="catalogFile" type="file" accept=".csv,.json,.jsonl,.ndjson,.yaml,.yml" />
+            </div>
+            <p>Required. Use user-supplied CSV, JSON, JSONL, YAML, Scryfall-like JSON, or MTGJSON-like JSON.</p>
+            <div class="inline-control">
+              <label for="catalogFormat">Catalog format</label>
+              <select id="catalogFormat">
+                <option value="csv">csv</option>
+                <option value="json">json</option>
+                <option value="jsonl">jsonl</option>
+                <option value="yaml">yaml</option>
+              </select>
+            </div>
+            <textarea id="catalogText" spellcheck="false" placeholder="Name,Type,Mana Cost,CMC,Colors,Rarity"></textarea>
+          </div>
+
+          <div class="field">
+            <div class="label-row">
+              <label for="collectionText">Collection CSV (optional)</label>
+              <input id="collectionFile" type="file" accept=".csv" />
+            </div>
+            <p>Optional ownership data for validation and craft context.</p>
+            <textarea id="collectionText" spellcheck="false" placeholder="Name,Quantity"></textarea>
+          </div>
+
+          <div class="field">
+            <div class="label-row">
+              <label for="resultLogText">Result log (optional)</label>
+              <input id="resultLogFile" type="file" accept=".csv,.json,.jsonl,.ndjson" />
+            </div>
+            <p>Optional user-supplied result-log.v1 CSV, JSON, or JSONL. This is not a tracker or live log watcher.</p>
+            <div class="inline-control">
+              <label for="resultLogFormat">Result-log format</label>
+              <select id="resultLogFormat">
+                <option value="csv">csv</option>
+                <option value="json">json</option>
+                <option value="jsonl">jsonl</option>
+              </select>
+            </div>
+            <textarea id="resultLogText" spellcheck="false" placeholder="record_type,match_id,game_number,queue,format,play_draw,won"></textarea>
+          </div>
+
+          <div class="field replay-field">
+            <div class="label-row">
+              <label for="replayFile">Report replay</label>
+              <input id="replayFile" type="file" accept=".json" />
+            </div>
+            <p>Render an existing analysis-report.v1 without rerunning validation or simulation.</p>
+            <textarea id="replayText" spellcheck="false" placeholder="{ &quot;schema_version&quot;: &quot;analysis-report.v1&quot; }"></textarea>
+            <div class="button-row">
+              <button id="replayReport" type="button" class="secondary">Replay report</button>
+              <button id="clearInputs" type="button" class="ghost">Clear inputs</button>
+            </div>
+          </div>
+
+          <div class="sticky-actions">
+            <button id="analyze" type="button" class="primary" disabled>Analyze</button>
+            <div class="export-actions" aria-label="Exports">
+              <button id="exportJson" type="button" class="secondary" disabled>Export JSON</button>
+              <button id="exportMarkdown" type="button" class="secondary" disabled>Export Markdown</button>
+              <button id="exportCsv" type="button" class="secondary" disabled>Export CSV</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="results-pane" aria-label="Results">
+          <div class="status-strip" id="statusStrip">
+            <span class="status-dot neutral"></span>
+            <span id="statusText">Add a decklist and catalog to begin.</span>
+          </div>
+
+          <div id="errorPanel" class="error-panel hidden" role="alert"></div>
+          <div id="results" class="results-grid"></div>
+        </section>
+      </main>
+
+      <footer>
+        Unofficial local-only fan tool. No MTG Arena client control, account login, tracker, scraper, or hosted service.
+      </footer>
+    </div>
+
+    <script src="/assets/app.js" type="module"></script>
+  </body>
+</html>
