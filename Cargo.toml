@@ -1,0 +1,46 @@
+[package]
+name = "mtgdeckbuilder"
+version = "0.1.0"
+edition = "2024"
+description = "Deterministic-first MTG Arena deck intelligence foundation"
+
+[lib]
+name = "mtgdeckbuilder"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mtgdeckbuilder"
+path = "src/main.rs"
+
+[[bin]]
+name = "mtgdeckbuilder-web"
+path = "src/bin/mtgdeckbuilder-web.rs"
+
+[dependencies]
+anyhow = "1.0.102"
+axum = "0.8.9"
+chrono = { version = "0.4.42", default-features = false, features = ["clock", "std"] }
+clap = { version = "4.6.1", features = ["derive"] }
+csv = "1.4.0"
+indexmap = { version = "2.14.0", features = ["serde"] }
+rand = "0.10"
+rand_chacha = "0.10.0"
+regex = "1.12.2"
+schemars = { version = "1.2.1", features = ["derive", "indexmap2"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+serde_yaml = "0.9.34"
+sha2 = "0.11.0"
+statrs = "0.18.0"
+thiserror = "2.0.18"
+tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "net"] }
+tower-http = { version = "0.6.10", features = ["cors"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+insta = "1.47.2"
+predicates = "3.1.4"
+pretty_assertions = "1.4.1"
+tempfile = "3.27.0"

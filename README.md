@@ -1,329 +1,227 @@
 # mtg-deckbuilder
 
-Offline, AI-ready Magic: The Gathering Arena deck intelligence.
+## What This Is
 
-`mtg-deckbuilder` is the working title for a personal MTG Arena deckbuilding assistant. It is designed to turn your local decklists, card catalogs, collection exports, metagame snapshots, and match-result CSVs into validated decklists, performance reports, feature summaries, and Arena import text. The long-term goal is simple: make it much easier to discover strong, legal, evidence-backed deck combinations with the help of AI and machine learning, without automating gameplay or trusting unsupported guesses.
+`mtg-deckbuilder` is a Rust-first, offline MTG Arena-oriented deck validation, ingestion, simulation, statistics, and reporting engine. It works from user-supplied card catalogs, decklists, collection files, and result records.
 
-This repository is the v0.1 foundation. It focuses on the trusted data layer that AI-assisted deckbuilding needs before any serious recommendation engine can be useful: clean cards, clear legality, normalized results, reproducible diagnostics, and conservative deck candidate generation from local evidence.
+It is not an MTG Arena client, overlay, tracker, bot, or exact gameplay simulator.
 
-## Who This Is For
+## Why It Exists
 
-This project is for MTG Arena players who want a private, offline-first deck intelligence workflow:
+Most MTG deck tools sell convenience around overlays, collection sync, pricing, draft helpers, metagame dashboards, or personal history. This project is aimed at a different layer: a deterministic, auditable Rust engine that can validate inputs, run seeded Bo1/Bo3-oriented simulations, calculate transparent metrics, and export structured artifacts for future dashboards, APIs, and LLM-assisted analysis.
 
-- Competitive ladder players who want to evaluate BO1 and BO3 performance from their own exported results.
-- Brewers who want to test whether a deck idea is legal, exportable, and supported by a local card catalog.
-- Players managing collections who want candidate decklists constrained by cards they own.
-- Data-minded players who track results in spreadsheets or tracker exports.
-- Open-source contributors who want an AGPL-licensed foundation for Arena deck analytics, CSV adapters, and future AI/ML deck recommendation work.
+## Current Capabilities
 
-It is not a gameplay bot, overlay, live match assistant, tracker, or Arena automation tool.
-
-## Why AI And ML Matter Here
-
-Good deckbuilding is a search problem. You are balancing legality, format, color requirements, mana curve, card roles, sideboard plans, metagame pressure, personal collection limits, matchup data, and observed win rates. Doing that manually across spreadsheets, deck sites, and tracker exports is slow.
-
-`mtg-deckbuilder` is meant to make that work feel almost effortless by preparing the data an AI or ML layer would need:
-
-- Normalize card truth from Scryfall or MTGJSON instead of relying on memory.
-- Normalize performance data from user-provided CSVs.
-- Separate BO1 and BO3 evidence so results are not mixed accidentally.
-- Rank decks with sample-size guardrails.
-- Validate generated lists before they ever become Arena import text.
-- Preserve provenance so a future model can explain why a candidate was suggested.
-
-The repo should eventually support AI-assisted recommendations such as “show me the strongest legal BO1 white aggro candidates from my collection” or “find decks with at least 60% observed win rate in my local data.” Those recommendations must remain evidence-labeled. A deck is not called a “winning deck” just because a model says so; it needs local performance data, enough games, and valid card legality.
-
-## Safety Boundary
-
-This project is for deck intelligence only.
-
-It does not:
-
-- automate MTG Arena gameplay
-- inspect live matches
-- scrape screens
-- control the mouse or keyboard
-- drive the Arena client
-- bypass paywalls or source terms
-- provide live match assistance
-
-Inputs are local files supplied by the user. Outputs are validated decklists, diagnostics, reports, feature summaries, and Arena import text.
-
-## Current Status
-
-Status: early v0.1 foundation, offline-first, deterministic, and source-conscious.
-
-The current implementation has no runtime dependencies and no advanced neural model. It builds the local data and validation substrate needed for later AI/ML work.
-
-## What It Can Do Today
-
-- Parse MTG Arena import text with mainboard and sideboard sections.
-- Export canonical Arena import text.
-- Validate deck construction rules:
-  - minimum mainboard size
-  - sideboard size
-  - non-basic copy limits
-  - basic land copy exception
-  - Arena export compatibility
-- Validate decklists against an optional normalized local card catalog:
-  - `unknown_card`
-  - `ambiguous_card`
-  - `missing_legality_data`
-  - `illegal_in_format`
-  - `banned_in_format`
-- Extract basic deck features:
-  - colors
-  - mana curve
-  - card type counts
-  - unknown cards
-- Normalize already-downloaded Scryfall and MTGJSON-style card data.
-- Embed normalization metadata and diagnostics in normalized card catalogs.
-- Print human-readable catalog normalization reports.
-- Profile and normalize user-provided CSV exports from Arena-adjacent source shapes.
-- Normalize user-provided Steam/Arena-style deck CSV exports inspired by the `vawlrathh` prototype.
-- Rank decks from local BO1/BO3 performance CSVs with sample-size guardrails.
-- Build conservative Arena-ready deck candidates from validated local evidence.
-- Generate deterministic offline advisor reports from local deck and catalog data.
-- Run a smoke evaluator that parses, validates, featureizes, and exports a deck.
-
-## Quick Start
-
-Clone the repo and run the test suite:
-
-```bash
-git clone https://github.com/clduab11/mtg-deckbuilder.git
-cd mtg-deckbuilder
-python3 -m mtgdeckbuilder --help
-make test
-```
-
-Optional editable install:
-
-```bash
-python3 -m pip install -e .
-mtgdeckbuilder --help
-```
-
-## Core Workflow
-
-Validate an Arena decklist against a local catalog:
-
-```bash
-python3 -m mtgdeckbuilder validate \
-  data/raw/sample_arena_deck.txt \
-  --catalog data/processed/sample_cards.json
-```
-
-Export canonical Arena import text:
-
-```bash
-python3 -m mtgdeckbuilder export data/raw/sample_arena_deck.txt
-```
-
-Run the smoke evaluator:
-
-```bash
-python3 -m mtgdeckbuilder eval-smoke \
-  data/raw/sample_arena_deck.txt \
-  --catalog data/processed/sample_cards.json
-```
-
-Generate an offline advisor report:
-
-```bash
-python3 -m mtgdeckbuilder advisor-report \
-  data/raw/sample_arena_deck.txt \
-  --catalog data/processed/sample_cards.json \
-  --format standard \
-  --queue bo1
-```
-
-Normalize already-downloaded Scryfall bulk-style data:
-
-```bash
-python3 -m mtgdeckbuilder normalize-cards \
-  scryfall \
-  tests/fixtures/scryfall_cards.json \
-  data/processed/normalized_cards.json
-```
-
-Normalize already-downloaded MTGJSON-style data:
-
-```bash
-python3 -m mtgdeckbuilder normalize-cards \
-  mtgjson \
-  tests/fixtures/mtgjson_cards.json \
-  data/processed/normalized_cards.json
-```
-
-Print catalog normalization diagnostics:
-
-```bash
-python3 -m mtgdeckbuilder normalize-report data/processed/normalized_cards.json
-```
-
-Inspect supported source profiles:
-
-```bash
-python3 -m mtgdeckbuilder source-profile list
-python3 -m mtgdeckbuilder source-profile inspect untapped_like_csv
-```
-
-Profile and normalize local CSV exports:
-
-```bash
-python3 -m mtgdeckbuilder csv-profile tests/fixtures/csv/untapped_like_results.csv
-python3 -m mtgdeckbuilder csv-normalize \
-  untapped_like_csv \
-  tests/fixtures/csv/untapped_like_results.csv \
-  data/processed/results.json
-python3 -m mtgdeckbuilder csv-report data/processed/results.json
-```
-
-Normalize a Steam/Arena-style deck CSV:
-
-```bash
-python3 -m mtgdeckbuilder csv-profile tests/fixtures/csv/steam_arena_deck.csv
-python3 -m mtgdeckbuilder csv-normalize \
-  steam_arena_deck_csv \
-  tests/fixtures/csv/steam_arena_deck.csv \
-  data/processed/steam_deck.json
-```
-
-Rank decks from local performance data:
-
-```bash
-python3 -m mtgdeckbuilder deck-rank data/processed/results.json --min-games 30
-```
-
-Build a conservative deck candidate from local card, collection, deck, and performance data:
-
-```bash
-python3 -m mtgdeckbuilder deck-build \
-  --cards data/processed/sample_cards.json \
-  --results data/processed/results.json \
-  --collection data/processed/collection.json \
-  --format standard \
-  --queue bo1
-```
-
-The default constructed legality format is `standard`. Override it with `--format`. The older `--cards` option remains accepted as a compatibility alias for catalog input on validation commands.
-
-## Data Sources And Compatibility
-
-The project treats external sites as compatibility targets, not data dependencies. Users provide local exports and remain responsible for each source's terms.
-
-Current source profile targets:
-
-- `untapped_like_csv`: Untapped.gg-style tracker/stat exports with wins, losses, rank scope, queue, and BO1/BO3 segmentation.
-- `aetherhub_like_deck`: AetherHub-style Arena deck rows with card counts and deck sections.
-- `mtggoldfish_like_metagame`: MTGGoldfish-style metagame rows with archetype and metagame share.
-- `steam_arena_deck_csv`: Steam/Arena-style deck CSV rows with quantity, name, set, type, mana cost, CMC, colors, and rarity.
-- `generic_card_csv`: card catalog spreadsheets.
-- `generic_collection_csv`: owned-card collection exports.
-- `generic_deck_csv`: generic deck rows.
-- `generic_match_results_csv`: generic performance rows.
-
-Future adapters can cover MTGDecks, MTGAZone, MTG Arena Pro, 17Lands, Moxfield, Archidekt, and CSV fixtures from GitHub, GitLab, or Bitbucket. Tests should stay fixture-only and network-free.
-
-## Vawlrathh Reference Path
-
-[`clduab11/vawlrathh`](https://github.com/clduab11/vawlrathh) is a separate public AGPL prototype for an MCP-powered Arena advisor. This repo uses it as a reference for future advisor, Steam CSV, MCP, and app-layer ideas, not as a dependency.
-
-Useful ideas from that prototype include deck-analysis tool shapes, Steam/Arena CSV examples, advisor-style reports, and possible future MCP or app interfaces. The clean offline core intentionally excludes the prototype's heavy runtime stack: FastAPI, Gradio, databases, OpenAI/Anthropic clients, embeddings, Torch, live Scryfall calls, live metagame lookups, and personality branding.
-
-The current `advisor-report` command is the first narrow bridge. It is deterministic, local-only, and evidence-labeled. It does not make AI calls, fetch network data, control Arena, or claim predicted win-rate improvements.
-
-## Data Model
-
-Normalized catalogs are deterministic JSON documents with a top-level `metadata` object and a top-level `cards` list. Existing catalog consumers read the `cards` list directly.
-
-```json
-{
-  "metadata": {
-    "schema_version": "foundation-003.v1",
-    "generated_at": "2026-05-12T00:00:00Z",
-    "source": "scryfall",
-    "input_path": "tests/fixtures/scryfall_cards.json",
-    "output_path": "data/processed/normalized_cards.json",
-    "input_count": 2,
-    "normalized_count": 2,
-    "skipped_count": 0,
-    "skipped_reasons": {},
-    "missing_high_value_fields_count": 0,
-    "missing_high_value_fields_by_field_name": {}
-  },
-  "cards": []
-}
-```
-
-Normalized card records preserve common local fields where available:
-
-- `name`
-- `mana_cost`
-- `mana_value`
-- `colors`
-- `color_identity`
-- `type_line`
-- `oracle_text`
-- `legalities`
-- `rarity`
-- `set_code`
-- `collector_number`
-- `arena_id`
-- `digital`
-- `games`
-- `layout`
-
-Malformed card records inside an otherwise valid payload are skipped and counted in metadata. Invalid source shapes fail fast.
-
-## Validation Philosophy
-
-Validation is deterministic and local. The project does not infer current card legality, oracle text, bans, restrictions, or metagame truth from LLM memory. Those facts must come from already-downloaded Scryfall, MTGJSON, Wizards of the Coast, or other official/current sources supplied by the user.
-
-Without `--catalog`, validation stays in heuristic deck-construction mode: it checks counts, sideboard size, basic-land copy exceptions by known Arena names, and export compatibility. With `--catalog`, each parsed Arena card name is resolved against the normalized local catalog. Missing legality is a warning because the catalog may be incomplete; explicit illegal or banned legality is an error.
-
-Performance claims are also evidence-bound. A deck is not labeled as a “60% BO1” deck unless local performance data includes enough games for the configured threshold. Card-only CSVs can support legal deck construction, but cannot support winning-deck claims.
+- Arena-style decklist parsing and export.
+- Collection CSV parsing with conservative ownership detection.
+- Local card catalog loading from Scryfall-like JSON, MTGJSON-like JSON, generic CSV, generic JSON, JSONL, and YAML.
+- Format-aware validation hooks for copy limits, sideboards, ownership, wildcards, bans, legalities, and Arena compatibility.
+- Seeded opening-hand and first-three-turn simulation proxies.
+- Bo1/Bo3-oriented simulation configs with explicit assumptions.
+- Constructed and draft metric primitives, including Wilson confidence intervals and sample-size warnings.
+- JSON, Markdown, and CSV report rendering.
+- `llm_report.v1` structured artifact generation.
+- Backend-ready API contract structs and route constants.
+- Local-only Axum adapter for deterministic Rust services.
 
 ## Architecture
 
-The code is organized as a Python `src/` package:
+```text
+src/
+  main.rs              thin CLI entrypoint
+  cli/                 command routing and output
+  domain/              public domain structs
+  catalog/             CSV/JSON/JSONL/YAML catalog ingestion and schemas
+  ingest/              source-specific deck, collection, Scryfall, MTGJSON loaders
+  rules/               validation rules
+  features/            deck feature extraction
+  sim/                 seeded simulation primitives plus bo1/bo3 configs
+  stats/               constructed and draft metric primitives
+  report/              JSON, Markdown, CSV report rendering
+  llm/                 structured LLM-ready artifacts only
+  api_contract/        future web/API request and response structs
+  web.rs               local-only Axum adapter
+```
 
-- `mtgdeckbuilder.ingest`: Arena deck parser, card models, and catalog normalization.
-- `mtgdeckbuilder.sources`: source profiles plus CSV profiling and normalization.
-- `mtgdeckbuilder.analysis`: offline deck performance aggregation.
-- `mtgdeckbuilder.advisor`: deterministic offline advisor reports.
-- `mtgdeckbuilder.build`: conservative evidence-backed deck candidate construction.
-- `mtgdeckbuilder.rules`: deterministic deck validator.
-- `mtgdeckbuilder.features`: basic offline feature extraction.
-- `mtgdeckbuilder.export`: Arena import text writer.
-- `mtgdeckbuilder.eval`: smoke evaluator.
-- `mtgdeckbuilder.observability`: lightweight logging helpers.
+## Data Formats
 
-The top-level `mtgdeckbuilder/` package is a small repo-root shim so `python3 -m mtgdeckbuilder` works from an uninstalled checkout.
+Supported catalog inputs:
 
-## Repository Layout
+- CSV: generic card rows and Steam/Arena-style aliases such as `Quantity,Name,Set,Type,Mana Cost,CMC,Colors,Rarity`.
+- JSON: Scryfall-like, MTGJSON-like, or `catalog.v1`.
+- JSONL: one `catalog.v1` card record per line.
+- YAML: `catalog.v1` document.
 
-- `data/raw/`: input decklists and raw local files.
-- `data/processed/`: normalized local catalogs and processed sample data.
-- `data/metagame/`: reserved for offline metagame snapshots.
-- `data/cache/`: ignored cache area for generated or downloaded local artifacts.
-- `reports/experiments/`: milestone assumptions, validation notes, and implementation logs.
-- `tests/`: deterministic fixture-only tests.
+Examples live in `examples/sample_catalog.csv`, `examples/sample_catalog.json`, `examples/sample_catalog.jsonl`, and `examples/sample_catalog.yaml`.
+
+Optional future analytics storage: Arrow/Parquet. These are not dependencies in V1 because the current surface is a CLI/library foundation, not a large analytics warehouse.
+
+## Quick Start
+
+```bash
+cargo build
+cargo test --all-features
+cargo run --bin mtgdeckbuilder -- --help
+```
+
+Validate the fixture deck:
+
+```bash
+cargo run --bin mtgdeckbuilder -- validate \
+  --deck examples/sample_deck.txt \
+  --cards tests/fixtures/cards_scryfall.json \
+  --collection tests/fixtures/collection.csv \
+  --format standard
+```
+
+## CLI Usage
+
+```bash
+cargo run --bin mtgdeckbuilder -- import-catalog \
+  --input examples/sample_catalog.csv
+
+cargo run --bin mtgdeckbuilder -- simulate \
+  --deck examples/sample_deck.txt \
+  --cards tests/fixtures/cards_scryfall.json \
+  --queue bo1 \
+  --trials 500 \
+  --seed 42
+
+cargo run --bin mtgdeckbuilder -- report \
+  --deck examples/sample_deck.txt \
+  --cards tests/fixtures/cards_scryfall.json \
+  --collection tests/fixtures/collection.csv \
+  --format standard \
+  --output markdown
+
+cargo run --bin mtgdeckbuilder -- schema --name catalog
+
+cargo run --bin mtgdeckbuilder -- llm-artifact \
+  --deck examples/sample_deck.txt \
+  --cards tests/fixtures/cards_scryfall.json \
+  --format standard \
+  --trials 100 \
+  --seed 42
+```
+
+## Simulation Model
+
+The simulator is Bo1/Bo3-oriented, not exact MTG Arena parity.
+
+- Bo1 uses an Arena-like opening-hand approximation and a 7-card accessible sideboard assumption.
+- Bo3 uses paper-random opening sampling and a 15-card sideboard assumption.
+- Both modes use seeded `rand_chacha::ChaCha8Rng` reproducibility.
+- Current outputs are opening-hand and early-turn quality proxies, not gameplay resolution or match win-rate truth.
+
+## Constructed Metrics
+
+The stats module supports:
+
+- overall game win rate
+- match win rate
+- Bo1 performance
+- Bo3 game performance
+- sideboard impact
+- mulligan sensitivity
+- opening-hand quality proxy via simulation reports
+- matchup matrix
+- Wilson confidence intervals
+- sample-size warnings
+- seeded reproducibility fields
+
+## Draft Metrics
+
+The draft metric primitives support:
+
+- card win rate
+- game-in-hand win rate
+- opening-hand win rate
+- improvement-when-drawn style delta
+- average last seen at and average taken at equivalents
+- pick order score
+- color-pair and archetype fields
+- trophy rate
+- wheel rate / signal proxy
+- pack and pick context
+- sample-size reliability flags
+
+## LLM Integration
+
+LLM support is deliberately outside the deterministic core. The CLI can emit `llm_report.v1`, a structured JSON artifact containing validation, metrics, assumptions, source hashes, limitations, and prompt guidance. LLMs may explain or summarize that evidence, but they must not change validation, simulation, or metric outcomes.
+
+## Web/API Readiness
+
+The repo includes backend-ready structs and route constants for:
+
+- `POST /deck/validate`
+- `POST /simulation/run`
+- `GET /simulation/{id}/status`
+- `GET /simulation/{id}/results`
+- `GET /simulation/{id}/report`
+- `POST /export`
+
+The local Axum adapter is a development convenience. This repo does not currently ship a hosted API or dashboard.
+
+## Monetization / Product Direction
+
+Research notes in `RESEARCH_NOTES.md` compare public positioning from Untapped.gg, AetherHub, MTGGoldfish, Arena Tutor/Draftsim, and 8Pack. Users pay for overlays, personal history, collection-aware recommendations, ad-free or unlimited storage, draft suggestions, pricing data, community comparisons, and dashboards.
+
+This repo can differentiate through:
+
+- free open-source CLI and deterministic engine
+- hosted paid simulation runs
+- pro dashboard subscription over user-owned data
+- draft-analysis premium tier
+- team testing workspace
+- API access for creators and data users
+- report exports for content creators
+
+Commercial layers must respect Wizards IP, fan content, trademark, and terms boundaries.
+
+## Verification
+
+Expected validation commands:
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features
+cargo build --release
+git diff --check
+```
+
+Smoke-test the main CLI surfaces:
+
+```bash
+cargo run --bin mtgdeckbuilder -- validate --deck examples/sample_deck.txt --cards tests/fixtures/cards_scryfall.json --collection tests/fixtures/collection.csv --format standard
+cargo run --bin mtgdeckbuilder -- import-catalog --input examples/sample_catalog.csv
+cargo run --bin mtgdeckbuilder -- simulate --deck examples/sample_deck.txt --cards tests/fixtures/cards_scryfall.json --queue bo1 --trials 25 --seed 7
+cargo run --bin mtgdeckbuilder -- export --deck examples/sample_deck.txt
+cargo run --bin mtgdeckbuilder -- report --deck examples/sample_deck.txt --cards tests/fixtures/cards_scryfall.json --collection tests/fixtures/collection.csv --format standard --output markdown --trials 25 --seed 7
+cargo run --bin mtgdeckbuilder -- schema --name catalog
+cargo run --bin mtgdeckbuilder -- llm-artifact --deck examples/sample_deck.txt --cards tests/fixtures/cards_scryfall.json --format standard --trials 25 --seed 7
+```
+
+## Limitations
+
+- Fixture card data is not authoritative.
+- Current legality, bans, restrictions, oracle text, Arena availability, and metagame state must be supplied from current trusted data.
+- The Arena-like Bo1 smoother is an approximation because exact MTG Arena behavior is not public.
+- Current simulation does not resolve full games, full match play, hidden information, combat, stack choices, or player decisions.
+- No gameplay automation, screen scraping, protected API access, or Arena client control is included.
+- No proprietary competitor schemas or code are copied.
 
 ## Roadmap
 
-- Choose a public project name and branding beyond the current working title.
-- Expand offline Scryfall/MTGJSON bulk-data workflow documentation.
-- Add broader source profile fixtures for MTGDecks, MTGAZone, MTG Arena Pro, 17Lands, Moxfield, Archidekt, GitHub, GitLab, and Bitbucket-hosted CSV examples.
-- Add richer deck feature extraction, including role tags, curve pressure, interaction density, and sideboard coverage.
-- Add richer format-aware legality and restriction profiles from local card catalogs.
-- Add matchup and metagame summaries from offline snapshots.
-- Add deterministic report generation for deck comparison.
-- Add AI/ML-assisted candidate scoring once the local evidence contracts are mature enough to support it responsibly.
+- Add richer result-log ingestion for user-owned match and draft records.
+- Expand matchup matrix and sideboard impact reports from real result data.
+- Add archetype clustering from transparent feature vectors.
+- Add optional Arrow/Parquet export behind a deliberate analytics feature gate.
+- Add hosted-job adapters around the existing `api_contract` structs.
+- Add web dashboard only after the CLI/library contracts stabilize.
 
-## License
+## License / Disclaimer
 
-`mtg-deckbuilder` is licensed under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`). See `LICENSE`.
+This repository is licensed under the AGPL-3.0 license in `LICENSE`.
 
-Magic: The Gathering and Magic: The Gathering Arena are trademarks of Wizards of the Coast. This project is unofficial and is not affiliated with or endorsed by Wizards of the Coast.
+`mtg-deckbuilder` is unofficial Fan Content. It is not affiliated with, endorsed by, sponsored by, or approved by Wizards of the Coast, Hasbro, Magic: The Gathering, or MTG Arena. Portions of the materials referenced by users may be property of Wizards of the Coast LLC. Users are responsible for ensuring that their data sources and use comply with applicable law, Wizards policies, MTG Arena terms, and third-party terms.

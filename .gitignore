@@ -1,4 +1,7 @@
-# Python
+# Rust
+target/
+
+# Python leftovers from the pre-Rust prototype
 __pycache__/
 *.py[cod]
 *.pyo
@@ -7,25 +10,30 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
-
-# Build and packaging
 /build/
 /dist/
 *.egg-info/
 .eggs/
-
-# Virtual environments
 .venv/
 venv/
 env/
 
 # Local files and generated output
+.env
 .DS_Store
 *.log
 *.tmp
 tmp/
+reports/*.json
+reports/*.jsonl
+experiments/*.json
+experiments/*.jsonl
+data/raw/*
 data/cache/*
+data/processed/*
+!data/raw/.gitkeep
 !data/cache/.gitkeep
+!data/processed/.gitkeep
 
 # Tooling
 .idea/

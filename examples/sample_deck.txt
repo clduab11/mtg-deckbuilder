@@ -1,0 +1,18 @@
+Deck
+24 Forest
+4 Test Bear
+4 Test Ranger
+4 Test Trick
+4 Test Growth
+4 Test Removal
+4 Test Engine
+4 Test Hydra
+4 Test Scout
+4 Test Sentinel
+
+Sideboard
+3 Test Shield
+3 Test Naturalize
+3 Test Grave Hate
+3 Test Sweeper Guard
+3 Test Control Plan

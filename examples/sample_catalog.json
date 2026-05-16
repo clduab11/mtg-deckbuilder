@@ -1,0 +1,22 @@
+{
+  "schema_version": "catalog.v1",
+  "cards": [
+    {
+      "name": "Forest",
+      "type_line": "Basic Land",
+      "mana_value": 0,
+      "color_identity": ["G"],
+      "rarity": "common",
+      "set_code": "TST"
+    },
+    {
+      "name": "Test Bear",
+      "type_line": "Creature - Bear",
+      "mana_cost": "{1}{G}",
+      "mana_value": 2,
+      "colors": ["G"],
+      "rarity": "common",
+      "set_code": "TST"
+    }
+  ]
+}
