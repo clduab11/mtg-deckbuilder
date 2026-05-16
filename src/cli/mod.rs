@@ -10,6 +10,7 @@ use crate::observability::deck_hash::deck_hash;
 use crate::observability::experiment_logger::write_experiment;
 use crate::observability::source_snapshot::file_sha256;
 use crate::report::{AnalysisReport, render_report};
+use crate::result_log::{load_result_log, summarize_loaded_result_log};
 use crate::rules::validator::DeckValidator;
 use crate::sim::bo1::Bo1Config;
 use crate::sim::bo3::Bo3Config;
@@ -44,6 +45,12 @@ enum Commands {
         craft_mode: bool,
     },
     ImportCatalog {
+        #[arg(long)]
+        input: String,
+        #[arg(long, default_value = "auto")]
+        format: String,
+    },
+    ImportResultLog {
         #[arg(long)]
         input: String,
         #[arg(long, default_value = "auto")]
@@ -88,6 +95,10 @@ enum Commands {
         format: String,
         #[arg(long, default_value = "json")]
         output: String,
+        #[arg(long)]
+        result_log: Option<String>,
+        #[arg(long, default_value = "auto")]
+        result_log_format: String,
         #[arg(long, default_value_t = 1000)]
         trials: u32,
         #[arg(long, default_value_t = 1)]
@@ -148,6 +159,7 @@ pub fn run() -> Result<u8> {
             craft_mode,
         } => cmd_validate(&deck, &cards, collection.as_deref(), &format, craft_mode),
         Commands::ImportCatalog { input, format } => cmd_import_catalog(&input, &format),
+        Commands::ImportResultLog { input, format } => cmd_import_result_log(&input, &format),
         Commands::Export { deck } => cmd_export(&deck),
         Commands::SimulateOpening {
             deck,
@@ -169,16 +181,22 @@ pub fn run() -> Result<u8> {
             collection,
             format,
             output,
+            result_log,
+            result_log_format,
             trials,
             seed,
         } => cmd_report(
-            &deck,
-            &cards,
-            collection.as_deref(),
-            &format,
+            AnalysisReportInputs {
+                deck_path: &deck,
+                cards_path: &cards,
+                collection_path: collection.as_deref(),
+                format_name: &format,
+                result_log_path: result_log.as_deref(),
+                result_log_format: Some(&result_log_format),
+                trials,
+                seed,
+            },
             &output,
-            trials,
-            seed,
         ),
         Commands::Schema { name } => cmd_schema(&name),
         Commands::LlmArtifact {
@@ -238,6 +256,12 @@ fn cmd_validate(
 
 fn cmd_import_catalog(path: &str, format: &str) -> Result<u8> {
     let loaded = load_catalog(path, Some(format))?;
+    print_json(loaded.report)?;
+    Ok(0)
+}
+
+fn cmd_import_result_log(path: &str, format: &str) -> Result<u8> {
+    let loaded = load_result_log(path, Some(format))?;
     print_json(loaded.report)?;
     Ok(0)
 }
@@ -304,36 +328,49 @@ fn cmd_simulate(
     Ok(0)
 }
 
-fn build_analysis_report(
-    deck_path: &str,
-    cards_path: &str,
-    collection_path: Option<&str>,
-    format_name: &str,
+struct AnalysisReportInputs<'a> {
+    deck_path: &'a str,
+    cards_path: &'a str,
+    collection_path: Option<&'a str>,
+    format_name: &'a str,
+    result_log_path: Option<&'a str>,
+    result_log_format: Option<&'a str>,
     trials: u32,
     seed: u64,
-) -> Result<AnalysisReport> {
-    let deck = parse_arena_decklist_file(deck_path)?;
-    let db = load_card_db(cards_path)?;
-    let collection = collection_path
+}
+
+fn build_analysis_report(inputs: &AnalysisReportInputs<'_>) -> Result<AnalysisReport> {
+    let deck = parse_arena_decklist_file(inputs.deck_path)?;
+    let db = load_card_db(inputs.cards_path)?;
+    let collection = inputs
+        .collection_path
         .map(|path| parse_collection_csv(path, None, None))
         .transpose()?;
     let validation = DeckValidator::new(db.clone()).validate(
         &deck,
-        format_name,
+        inputs.format_name,
         collection.as_ref(),
         false,
         None,
     );
-    let opening = simulate_opening_hands(&deck, &db, "arena_n2", trials, seed, 2)?;
-    let early = simulate_first_three_turns(&deck, &db, trials, seed)?;
+    let opening = simulate_opening_hands(&deck, &db, "arena_n2", inputs.trials, inputs.seed, 2)?;
+    let early = simulate_first_three_turns(&deck, &db, inputs.trials, inputs.seed)?;
     let features = extract_deck_features(&deck, &db);
     let consistency = score_consistency(&opening, &early);
     let mut source_hashes = BTreeMap::new();
-    source_hashes.insert("cards".to_string(), file_sha256(cards_path)?);
-    if let Some(collection_path) = collection_path {
+    source_hashes.insert("cards".to_string(), file_sha256(inputs.cards_path)?);
+    if let Some(collection_path) = inputs.collection_path {
         source_hashes.insert("collection".to_string(), file_sha256(collection_path)?);
     }
-    source_hashes.insert("deck".to_string(), file_sha256(deck_path)?);
+    source_hashes.insert("deck".to_string(), file_sha256(inputs.deck_path)?);
+    let result_log = inputs
+        .result_log_path
+        .map(|path| {
+            let loaded = load_result_log(path, inputs.result_log_format)?;
+            source_hashes.insert("result_log".to_string(), file_sha256(path)?);
+            summarize_loaded_result_log(&loaded)
+        })
+        .transpose()?;
     Ok(AnalysisReport {
         schema_version: "analysis-report.v1".to_string(),
         generated_by: "mtgdeckbuilder-rust".to_string(),
@@ -346,27 +383,13 @@ fn build_analysis_report(
         early_turns: serde_json::to_value(early)?,
         features,
         consistency,
+        result_log,
         source_hashes,
     })
 }
 
-fn cmd_report(
-    deck_path: &str,
-    cards_path: &str,
-    collection_path: Option<&str>,
-    format_name: &str,
-    output: &str,
-    trials: u32,
-    seed: u64,
-) -> Result<u8> {
-    let report = build_analysis_report(
-        deck_path,
-        cards_path,
-        collection_path,
-        format_name,
-        trials,
-        seed,
-    )?;
+fn cmd_report(inputs: AnalysisReportInputs<'_>, output: &str) -> Result<u8> {
+    let report = build_analysis_report(&inputs)?;
     print!("{}", render_report(&report, output)?);
     Ok(0)
 }
@@ -374,6 +397,7 @@ fn cmd_report(
 fn cmd_schema(name: &str) -> Result<u8> {
     let schema = match name {
         "catalog" | "catalog-load-report" => crate::catalog::schema_json(name)?,
+        "result-log" | "result-log-load-report" => crate::result_log::schema_json(name)?,
         "llm" | "llm-report" => crate::llm::schema_json()?,
         "api-deck-validate-request" => crate::api_contract::schema_json("deck-validate-request")?,
         "api-simulation-run-request" => crate::api_contract::schema_json("simulation-run-request")?,
@@ -391,7 +415,16 @@ fn cmd_llm_artifact(
     trials: u32,
     seed: u64,
 ) -> Result<u8> {
-    let report = build_analysis_report(deck_path, cards_path, None, format_name, trials, seed)?;
+    let report = build_analysis_report(&AnalysisReportInputs {
+        deck_path,
+        cards_path,
+        collection_path: None,
+        format_name,
+        result_log_path: None,
+        result_log_format: None,
+        trials,
+        seed,
+    })?;
     let artifact = LlmAnalysisArtifact::new(serde_json::to_value(report)?);
     print_json(artifact)?;
     Ok(0)

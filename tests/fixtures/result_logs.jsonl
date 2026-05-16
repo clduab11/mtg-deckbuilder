@@ -1,0 +1,4 @@
+{"record_type":"game","match_id":"m1","game_number":1,"queue":"bo1","format_name":"standard","play_draw":"play","opponent_archetype":"aggro","won":true,"mulligans":0,"sideboarded":false}
+{"record_type":"game","match_id":"m2","game_number":1,"queue":"bo3","format_name":"standard","play_draw":"draw","opponent_archetype":"control","won":false,"mulligans":1,"sideboarded":true}
+{"record_type":"game","match_id":"m2","game_number":2,"queue":"bo3","format_name":"standard","play_draw":"play","opponent_archetype":"control","won":true,"mulligans":0,"sideboarded":true}
+{"record_type":"draft_pick","draft_id":"d1","card_name":"Test Bear","pack_number":1,"pick_number":2,"seen_at_pick":3,"taken":true,"opening_hand_games":3,"opening_hand_wins":2,"drawn_games":5,"drawn_wins":4,"games":8,"wins":5,"trophies":1,"events":2,"color_pair":"G","archetype":"stompy","wheeled":false}

@@ -1,6 +1,7 @@
 use mtgdeckbuilder::api_contract::{DeckValidateRequest, ROUTES};
 use mtgdeckbuilder::catalog::load_catalog;
 use mtgdeckbuilder::llm::LlmAnalysisArtifact;
+use mtgdeckbuilder::result_log::{load_result_log, schema_json, summarize_loaded_result_log};
 use mtgdeckbuilder::sim::bo1::Bo1Config;
 use mtgdeckbuilder::sim::bo3::Bo3Config;
 use mtgdeckbuilder::stats::{
@@ -107,6 +108,7 @@ fn constructed_stats_include_confidence_and_warnings() {
             game_number: 1,
             queue: "bo1".to_string(),
             format_name: "standard".to_string(),
+            play_draw: Some("play".to_string()),
             opponent_archetype: Some("aggro".to_string()),
             won: true,
             mulligans: 0,
@@ -117,6 +119,7 @@ fn constructed_stats_include_confidence_and_warnings() {
             game_number: 1,
             queue: "bo3".to_string(),
             format_name: "standard".to_string(),
+            play_draw: Some("draw".to_string()),
             opponent_archetype: Some("control".to_string()),
             won: false,
             mulligans: 1,
@@ -127,6 +130,7 @@ fn constructed_stats_include_confidence_and_warnings() {
     assert_eq!(summary.game_win_rate.successes, 1);
     assert!(summary.game_win_rate.sample_size_warning.is_some());
     assert!(summary.matchup_matrix.contains_key("aggro"));
+    assert!(summary.play_draw_performance.contains_key("play"));
 
     let larger = rate(75, 100);
     assert_eq!(larger.reliability, "high");
@@ -182,6 +186,91 @@ fn draft_stats_include_pick_and_drawn_metrics() {
     assert_eq!(summary.average_last_seen_at, 6.0);
     assert!(summary.game_in_hand_win_rate.rate > 0.0);
     assert!(summary.wheel_rate.rate > 0.0);
+}
+
+#[test]
+fn result_log_loads_csv_json_and_jsonl() {
+    for (path, format, expected_games, expected_draft_picks) in [
+        ("tests/fixtures/result_logs.csv", "csv", 3, 1),
+        ("tests/fixtures/result_logs.json", "json", 3, 2),
+        ("tests/fixtures/result_logs.jsonl", "jsonl", 3, 1),
+    ] {
+        let loaded = load_result_log(path, Some(format)).unwrap();
+        assert_eq!(loaded.report.schema_version, "result-log-load-report.v1");
+        assert_eq!(loaded.report.game_count, expected_games);
+        assert_eq!(loaded.report.draft_pick_count, expected_draft_picks);
+        assert_eq!(loaded.games.len(), expected_games);
+        assert_eq!(loaded.draft_picks.len(), expected_draft_picks);
+        assert_eq!(loaded.games[0].play_draw.as_deref(), Some("play"));
+        assert_eq!(loaded.games[0].opponent_archetype.as_deref(), Some("aggro"));
+        assert_eq!(loaded.games[1].mulligans, 1);
+        assert!(loaded.games[1].sideboarded);
+        assert_eq!(loaded.draft_picks[0].pack_number, 1);
+        assert_eq!(loaded.draft_picks[0].pick_number, 2);
+    }
+}
+
+#[test]
+fn result_log_rejects_bad_schema_and_missing_required_csv_fields() {
+    let dir = tempfile::tempdir().unwrap();
+    let json_path = dir.path().join("bad_result_log.json");
+    std::fs::write(
+        &json_path,
+        r#"{"schema_version":"result-log.v2","games":[],"draft_picks":[]}"#,
+    )
+    .unwrap();
+    let json_error = load_result_log(&json_path, Some("json")).unwrap_err();
+    assert!(
+        json_error
+            .to_string()
+            .contains("Unsupported result-log schema_version")
+    );
+
+    let csv_path = dir.path().join("bad_result_log.csv");
+    std::fs::write(
+        &csv_path,
+        "record_type,match_id,game_number,queue,format,won,mulligans,sideboarded\n\
+         game,m1,1,bo1,standard,true,0,false\n\
+         ,m2,1,bo1,standard,false,1,false\n",
+    )
+    .unwrap();
+    let csv_error = load_result_log(&csv_path, Some("csv")).unwrap_err();
+    assert!(
+        csv_error
+            .to_string()
+            .contains("missing required field record_type")
+    );
+}
+
+#[test]
+fn result_log_feeds_stats_and_report_summary() {
+    let loaded = load_result_log("tests/fixtures/result_logs.json", Some("json")).unwrap();
+    let constructed = summarize_constructed(&loaded.games);
+    assert_eq!(constructed.games, 3);
+    assert_eq!(constructed.matches, 2);
+    assert_eq!(
+        constructed
+            .play_draw_performance
+            .get("play")
+            .unwrap()
+            .successes,
+        2
+    );
+
+    let summary = summarize_loaded_result_log(&loaded).unwrap();
+    assert_eq!(summary["schema_version"], "result-log-summary.v1");
+    assert_eq!(summary["source"]["game_count"], 3);
+    assert_eq!(summary["source"]["draft_pick_count"], 2);
+    assert!(summary["constructed"]["matchup_matrix"]["aggro"]["rate"].is_number());
+    assert!(summary["draft_cards"]["Test Bear"]["card_win_rate"]["rate"].is_number());
+}
+
+#[test]
+fn result_log_schemas_are_available() {
+    let document_schema = schema_json("result-log").unwrap();
+    let report_schema = schema_json("result-log-load-report").unwrap();
+    assert!(document_schema.to_string().contains("ResultLogDocument"));
+    assert!(report_schema.to_string().contains("ResultLogLoadReport"));
 }
 
 #[test]

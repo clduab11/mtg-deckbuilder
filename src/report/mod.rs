@@ -14,6 +14,8 @@ pub struct AnalysisReport {
     pub early_turns: Value,
     pub features: Value,
     pub consistency: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_log: Option<Value>,
     pub source_hashes: BTreeMap<String, String>,
 }
 
@@ -45,6 +47,24 @@ pub fn render_markdown(report: &AnalysisReport) -> String {
     for assumption in &report.assumptions {
         lines.push(format!("- {assumption}"));
     }
+    if let Some(result_log) = &report.result_log {
+        let game_count = result_log
+            .get("source")
+            .and_then(|source| source.get("game_count"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let draft_pick_count = result_log
+            .get("source")
+            .and_then(|source| source.get("draft_pick_count"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        lines.extend([
+            String::new(),
+            "## Result Log".to_string(),
+            format!("- Games: {game_count}"),
+            format!("- Draft picks: {draft_pick_count}"),
+        ]);
+    }
     lines.extend([String::new(), "## Source Hashes".to_string()]);
     for (name, hash) in &report.source_hashes {
         lines.push(format!("- {name}: `{hash}`"));
@@ -70,6 +90,23 @@ pub fn render_csv(report: &AnalysisReport) -> Result<String> {
         .and_then(Value::as_f64)
     {
         writer.write_record(["consistency_score", &score.to_string()])?;
+    }
+    if let Some(result_log) = &report.result_log {
+        let source = result_log.get("source").unwrap_or(&Value::Null);
+        if let Some(game_count) = source.get("game_count").and_then(Value::as_u64) {
+            writer.write_record(["result_log.games", &game_count.to_string()])?;
+        }
+        if let Some(draft_pick_count) = source.get("draft_pick_count").and_then(Value::as_u64) {
+            writer.write_record(["result_log.draft_picks", &draft_pick_count.to_string()])?;
+        }
+        if let Some(rate) = result_log
+            .get("constructed")
+            .and_then(|constructed| constructed.get("game_win_rate"))
+            .and_then(|summary| summary.get("rate"))
+            .and_then(Value::as_f64)
+        {
+            writer.write_record(["result_log.game_win_rate", &rate.to_string()])?;
+        }
     }
     for (name, hash) in &report.source_hashes {
         writer.write_record([format!("source_hash.{name}"), hash.clone()])?;

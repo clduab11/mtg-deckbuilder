@@ -11,6 +11,7 @@ pub mod llm;
 pub mod mcp;
 pub mod observability;
 pub mod report;
+pub mod result_log;
 pub mod rules;
 pub mod search;
 pub mod sim;

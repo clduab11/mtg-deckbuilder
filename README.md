@@ -15,6 +15,7 @@ Most MTG deck tools sell convenience around overlays, collection sync, pricing, 
 - Arena-style decklist parsing and export.
 - Collection CSV parsing with conservative ownership detection.
 - Local card catalog loading from Scryfall-like JSON, MTGJSON-like JSON, generic CSV, generic JSON, JSONL, and YAML.
+- Local `result-log.v1` loading from user-supplied CSV, JSON, and JSONL match/draft records.
 - Format-aware validation hooks for copy limits, sideboards, ownership, wildcards, bans, legalities, and Arena compatibility.
 - Seeded opening-hand and first-three-turn simulation proxies.
 - Bo1/Bo3-oriented simulation configs with explicit assumptions.
@@ -33,6 +34,7 @@ src/
   domain/              public domain structs
   catalog/             CSV/JSON/JSONL/YAML catalog ingestion and schemas
   ingest/              source-specific deck, collection, Scryfall, MTGJSON loaders
+  result_log/          user-owned local match and draft result-log ingestion
   rules/               validation rules
   features/            deck feature extraction
   sim/                 seeded simulation primitives plus bo1/bo3 configs
@@ -53,6 +55,14 @@ Supported catalog inputs:
 - YAML: `catalog.v1` document.
 
 Examples live in `examples/sample_catalog.csv`, `examples/sample_catalog.json`, `examples/sample_catalog.jsonl`, and `examples/sample_catalog.yaml`.
+
+Supported result-log inputs:
+
+- CSV: typed rows with `record_type` set to `game` or `draft_pick`.
+- JSON: `result-log.v1` document with `games` and `draft_picks`.
+- JSONL: one typed `game` or `draft_pick` record per line.
+
+Result logs are user-supplied local files only. They are not imported from live trackers, hosted APIs, MTG Arena clients, or external scrapers.
 
 Optional future analytics storage: Arrow/Parquet. These are not dependencies in V1 because the current surface is a CLI/library foundation, not a large analytics warehouse.
 
@@ -80,6 +90,9 @@ cargo run --bin mtgdeckbuilder -- validate \
 cargo run --bin mtgdeckbuilder -- import-catalog \
   --input examples/sample_catalog.csv
 
+cargo run --bin mtgdeckbuilder -- import-result-log \
+  --input tests/fixtures/result_logs.csv
+
 cargo run --bin mtgdeckbuilder -- simulate \
   --deck examples/sample_deck.txt \
   --cards tests/fixtures/cards_scryfall.json \
@@ -92,9 +105,11 @@ cargo run --bin mtgdeckbuilder -- report \
   --cards tests/fixtures/cards_scryfall.json \
   --collection tests/fixtures/collection.csv \
   --format standard \
-  --output markdown
+  --output markdown \
+  --result-log tests/fixtures/result_logs.json
 
 cargo run --bin mtgdeckbuilder -- schema --name catalog
+cargo run --bin mtgdeckbuilder -- schema --name result-log
 
 cargo run --bin mtgdeckbuilder -- llm-artifact \
   --deck examples/sample_deck.txt \
@@ -123,6 +138,7 @@ The stats module supports:
 - Bo3 game performance
 - sideboard impact
 - mulligan sensitivity
+- play/draw performance from user-supplied result logs
 - opening-hand quality proxy via simulation reports
 - matchup matrix
 - Wilson confidence intervals
@@ -213,8 +229,7 @@ cargo run --bin mtgdeckbuilder -- llm-artifact --deck examples/sample_deck.txt -
 
 ## Roadmap
 
-- Add richer result-log ingestion for user-owned match and draft records.
-- Expand matchup matrix and sideboard impact reports from real result data.
+- Expand matchup matrix and sideboard impact reports from user-owned result data.
 - Add archetype clustering from transparent feature vectors.
 - Add optional Arrow/Parquet export behind a deliberate analytics feature gate.
 - Add hosted-job adapters around the existing `api_contract` structs.

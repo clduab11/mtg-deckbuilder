@@ -1,0 +1,78 @@
+{
+  "schema_version": "result-log.v1",
+  "games": [
+    {
+      "match_id": "m1",
+      "game_number": 1,
+      "queue": "bo1",
+      "format_name": "standard",
+      "play_draw": "play",
+      "opponent_archetype": "aggro",
+      "won": true,
+      "mulligans": 0,
+      "sideboarded": false
+    },
+    {
+      "match_id": "m2",
+      "game_number": 1,
+      "queue": "bo3",
+      "format_name": "standard",
+      "play_draw": "draw",
+      "opponent_archetype": "control",
+      "won": false,
+      "mulligans": 1,
+      "sideboarded": true
+    },
+    {
+      "match_id": "m2",
+      "game_number": 2,
+      "queue": "bo3",
+      "format_name": "standard",
+      "play_draw": "play",
+      "opponent_archetype": "control",
+      "won": true,
+      "mulligans": 0,
+      "sideboarded": true
+    }
+  ],
+  "draft_picks": [
+    {
+      "draft_id": "d1",
+      "card_name": "Test Bear",
+      "pack_number": 1,
+      "pick_number": 2,
+      "seen_at_pick": 3,
+      "taken": true,
+      "opening_hand_games": 3,
+      "opening_hand_wins": 2,
+      "drawn_games": 5,
+      "drawn_wins": 4,
+      "games": 8,
+      "wins": 5,
+      "trophies": 1,
+      "events": 2,
+      "color_pair": "G",
+      "archetype": "stompy",
+      "wheeled": false
+    },
+    {
+      "draft_id": "d2",
+      "card_name": "Test Bear",
+      "pack_number": 1,
+      "pick_number": 8,
+      "seen_at_pick": 9,
+      "taken": false,
+      "opening_hand_games": 1,
+      "opening_hand_wins": 0,
+      "drawn_games": 2,
+      "drawn_wins": 1,
+      "games": 3,
+      "wins": 1,
+      "trophies": 0,
+      "events": 1,
+      "color_pair": "G",
+      "archetype": "stompy",
+      "wheeled": true
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+record_type,match_id,game_number,queue,format,play_draw,won,mulligans,sideboarded,opponent_archetype,draft_id,card_name,pack_number,pick_number,seen_at_pick,taken,opening_hand_games,opening_hand_wins,drawn_games,drawn_wins,games,wins,trophies,events,color_pair,archetype,wheeled
+game,m1,1,bo1,standard,play,true,0,false,aggro,,,,,,,,,,,,,,,,,
+game,m2,1,bo3,standard,draw,loss,1,true,control,,,,,,,,,,,,,,,,,
+game,m2,2,bo3,standard,play,win,0,true,control,,,,,,,,,,,,,,,,,
+draft_pick,,,,,,,,,,d1,Test Bear,1,2,3,true,3,2,5,4,8,5,1,2,G,stompy,false

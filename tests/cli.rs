@@ -77,6 +77,20 @@ fn cli_v1_smoke_commands_work() {
     Command::cargo_bin("mtgdeckbuilder")
         .unwrap()
         .args([
+            "import-result-log",
+            "--input",
+            "tests/fixtures/result_logs.csv",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"schema_version\": \"result-log-load-report.v1\"",
+        ))
+        .stdout(predicate::str::contains("\"game_count\": 3"));
+
+    Command::cargo_bin("mtgdeckbuilder")
+        .unwrap()
+        .args([
             "simulate",
             "--deck",
             "examples/sample_deck.txt",
@@ -104,6 +118,13 @@ fn cli_v1_smoke_commands_work() {
 
     Command::cargo_bin("mtgdeckbuilder")
         .unwrap()
+        .args(["schema", "--name", "result-log"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ResultLogDocument"));
+
+    Command::cargo_bin("mtgdeckbuilder")
+        .unwrap()
         .args([
             "report",
             "--deck",
@@ -116,6 +137,8 @@ fn cli_v1_smoke_commands_work() {
             "standard",
             "--output",
             "markdown",
+            "--result-log",
+            "tests/fixtures/result_logs.json",
             "--trials",
             "25",
             "--seed",
@@ -123,7 +146,36 @@ fn cli_v1_smoke_commands_work() {
         ])
         .assert()
         .success()
-        .stdout(predicate::str::contains("MTG Deck Analysis Report"));
+        .stdout(predicate::str::contains("MTG Deck Analysis Report"))
+        .stdout(predicate::str::contains("Result Log"));
+
+    Command::cargo_bin("mtgdeckbuilder")
+        .unwrap()
+        .args([
+            "report",
+            "--deck",
+            "examples/sample_deck.txt",
+            "--cards",
+            "tests/fixtures/cards_scryfall.json",
+            "--collection",
+            "tests/fixtures/collection.csv",
+            "--format",
+            "standard",
+            "--output",
+            "json",
+            "--result-log",
+            "tests/fixtures/result_logs.jsonl",
+            "--result-log-format",
+            "jsonl",
+            "--trials",
+            "25",
+            "--seed",
+            "7",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"result_log\""))
+        .stdout(predicate::str::contains("\"constructed\""));
 
     Command::cargo_bin("mtgdeckbuilder")
         .unwrap()

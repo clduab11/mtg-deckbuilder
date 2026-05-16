@@ -27,6 +27,8 @@ pub struct GameRecord {
     pub game_number: u8,
     pub queue: String,
     pub format_name: String,
+    #[serde(default)]
+    pub play_draw: Option<String>,
     pub opponent_archetype: Option<String>,
     pub won: bool,
     pub mulligans: u8,
@@ -41,6 +43,7 @@ pub struct ConstructedSummary {
     pub match_win_rate: RateSummary,
     pub bo1_performance: Option<RateSummary>,
     pub bo3_game_performance: Option<RateSummary>,
+    pub play_draw_performance: BTreeMap<String, RateSummary>,
     pub mulligan_sensitivity: BTreeMap<String, RateSummary>,
     pub matchup_matrix: BTreeMap<String, RateSummary>,
     pub sideboard_impact: Option<RateSummary>,
@@ -192,6 +195,24 @@ pub fn summarize_constructed(records: &[GameRecord]) -> ConstructedSummary {
             ),
         );
     }
+    let mut play_draw_performance = BTreeMap::new();
+    for play_draw in records
+        .iter()
+        .filter_map(|record| record.play_draw.clone())
+        .collect::<BTreeSet<_>>()
+    {
+        let group: Vec<_> = records
+            .iter()
+            .filter(|record| record.play_draw.as_deref() == Some(play_draw.as_str()))
+            .collect();
+        play_draw_performance.insert(
+            play_draw,
+            rate(
+                group.iter().filter(|record| record.won).count() as u32,
+                group.len() as u32,
+            ),
+        );
+    }
     let sideboarded: Vec<_> = records.iter().filter(|record| record.sideboarded).collect();
     ConstructedSummary {
         games: records.len() as u32,
@@ -210,6 +231,7 @@ pub fn summarize_constructed(records: &[GameRecord]) -> ConstructedSummary {
                 bo3.len() as u32,
             )
         }),
+        play_draw_performance,
         mulligan_sensitivity,
         matchup_matrix,
         sideboard_impact: (!sideboarded.is_empty()).then(|| {
