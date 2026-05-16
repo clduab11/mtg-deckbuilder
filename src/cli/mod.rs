@@ -1,3 +1,4 @@
+use crate::analysis::{AnalysisInputs, build_analysis_report as build_shared_analysis_report};
 use crate::catalog::{load_catalog, load_catalog_auto};
 use crate::eval::consistency::score_consistency;
 use crate::export::arena::format_arena_decklist;
@@ -10,7 +11,7 @@ use crate::observability::deck_hash::deck_hash;
 use crate::observability::experiment_logger::write_experiment;
 use crate::observability::source_snapshot::file_sha256;
 use crate::report::{AnalysisReport, render_report};
-use crate::result_log::{load_result_log, summarize_loaded_result_log};
+use crate::result_log::load_result_log;
 use crate::rules::validator::DeckValidator;
 use crate::sim::bo1::Bo1Config;
 use crate::sim::bo3::Bo3Config;
@@ -341,22 +342,11 @@ struct AnalysisReportInputs<'a> {
 
 fn build_analysis_report(inputs: &AnalysisReportInputs<'_>) -> Result<AnalysisReport> {
     let deck = parse_arena_decklist_file(inputs.deck_path)?;
-    let db = load_card_db(inputs.cards_path)?;
+    let catalog = load_catalog_auto(inputs.cards_path)?;
     let collection = inputs
         .collection_path
         .map(|path| parse_collection_csv(path, None, None))
         .transpose()?;
-    let validation = DeckValidator::new(db.clone()).validate(
-        &deck,
-        inputs.format_name,
-        collection.as_ref(),
-        false,
-        None,
-    );
-    let opening = simulate_opening_hands(&deck, &db, "arena_n2", inputs.trials, inputs.seed, 2)?;
-    let early = simulate_first_three_turns(&deck, &db, inputs.trials, inputs.seed)?;
-    let features = extract_deck_features(&deck, &db);
-    let consistency = score_consistency(&opening, &early);
     let mut source_hashes = BTreeMap::new();
     source_hashes.insert("cards".to_string(), file_sha256(inputs.cards_path)?);
     if let Some(collection_path) = inputs.collection_path {
@@ -368,22 +358,19 @@ fn build_analysis_report(inputs: &AnalysisReportInputs<'_>) -> Result<AnalysisRe
         .map(|path| {
             let loaded = load_result_log(path, inputs.result_log_format)?;
             source_hashes.insert("result_log".to_string(), file_sha256(path)?);
-            summarize_loaded_result_log(&loaded)
+            Ok::<_, anyhow::Error>(loaded)
         })
         .transpose()?;
-    Ok(AnalysisReport {
-        schema_version: "analysis-report.v1".to_string(),
-        generated_by: "mtgdeckbuilder-rust".to_string(),
-        assumptions: vec![
-            "Bo1/Bo3-oriented offline analysis; no exact MTG Arena parity claim.".to_string(),
-            "Fixture data is not authoritative legality or metagame data.".to_string(),
-        ],
-        validation: serde_json::to_value(validation)?,
-        opening_hand: serde_json::to_value(opening)?,
-        early_turns: serde_json::to_value(early)?,
-        features,
-        consistency,
+
+    build_shared_analysis_report(AnalysisInputs {
+        deck,
+        catalog,
+        collection,
         result_log,
+        format_name: inputs.format_name.to_string(),
+        queue: "bo1".to_string(),
+        trials: inputs.trials,
+        seed: inputs.seed,
         source_hashes,
     })
 }

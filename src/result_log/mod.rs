@@ -4,7 +4,7 @@ use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize, PartialEq)]
@@ -58,6 +58,19 @@ fn format_from_path(path: &Path, explicit: Option<&str>) -> Result<String> {
         })
 }
 
+fn format_from_source_label(source_label: &str, explicit: Option<&str>) -> Result<String> {
+    if let Some(format) = explicit.filter(|format| *format != "auto") {
+        return Ok(format.to_ascii_lowercase());
+    }
+    Path::new(source_label)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .ok_or_else(|| {
+            anyhow!("Could not infer result-log format from source label: {source_label}")
+        })
+}
+
 pub fn load_result_log_auto(path: impl AsRef<Path>) -> Result<LoadedResultLog> {
     load_result_log(path, None)
 }
@@ -89,9 +102,44 @@ pub fn load_result_log(
     })
 }
 
+pub fn load_result_log_from_str(
+    source_label: impl Into<String>,
+    explicit_format: Option<&str>,
+    text: &str,
+) -> Result<LoadedResultLog> {
+    let source_label = source_label.into();
+    let format = format_from_source_label(&source_label, explicit_format)?;
+    let mut warnings = Vec::new();
+    let (games, draft_picks) = match format.as_str() {
+        "csv" => {
+            let reader = csv::Reader::from_reader(text.as_bytes());
+            load_csv_result_log_from_reader(reader, &mut warnings)?
+        }
+        "json" => load_json_result_log_from_str(text)?,
+        "jsonl" | "ndjson" => load_jsonl_result_log_from_str(text, &mut warnings)?,
+        other => return Err(anyhow!("Unsupported result-log format: {other}")),
+    };
+    Ok(LoadedResultLog {
+        report: ResultLogLoadReport {
+            schema_version: "result-log-load-report.v1".to_string(),
+            source_path: source_label,
+            format,
+            game_count: games.len(),
+            draft_pick_count: draft_picks.len(),
+            warnings,
+        },
+        games,
+        draft_picks,
+    })
+}
+
 fn load_json_result_log(path: &Path) -> Result<(Vec<GameRecord>, Vec<DraftPickRecord>)> {
     let text = std::fs::read_to_string(path)?;
-    let document: ResultLogDocument = serde_json::from_str(&text)?;
+    load_json_result_log_from_str(&text)
+}
+
+fn load_json_result_log_from_str(text: &str) -> Result<(Vec<GameRecord>, Vec<DraftPickRecord>)> {
+    let document: ResultLogDocument = serde_json::from_str(text)?;
     ensure_result_log_v1(&document.schema_version)?;
     Ok((document.games, document.draft_picks))
 }
@@ -121,11 +169,41 @@ fn load_jsonl_result_log(
     Ok((games, draft_picks))
 }
 
+fn load_jsonl_result_log_from_str(
+    text: &str,
+    warnings: &mut Vec<String>,
+) -> Result<(Vec<GameRecord>, Vec<DraftPickRecord>)> {
+    let mut games = Vec::new();
+    let mut draft_picks = Vec::new();
+    for (idx, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            warnings.push(format!("JSONL line {} skipped: blank line", idx + 1));
+            continue;
+        }
+        let value: Value = serde_json::from_str(line)
+            .map_err(|error| anyhow!("JSONL line {}: {error}", idx + 1))?;
+        push_row(
+            value_to_map(value, &format!("JSONL line {}", idx + 1))?,
+            &format!("JSONL line {}", idx + 1),
+            &mut games,
+            &mut draft_picks,
+        )?;
+    }
+    Ok((games, draft_picks))
+}
+
 fn load_csv_result_log(
     path: &Path,
     warnings: &mut Vec<String>,
 ) -> Result<(Vec<GameRecord>, Vec<DraftPickRecord>)> {
-    let mut reader = csv::Reader::from_path(path)?;
+    let reader = csv::Reader::from_path(path)?;
+    load_csv_result_log_from_reader(reader, warnings)
+}
+
+fn load_csv_result_log_from_reader<R: Read>(
+    mut reader: csv::Reader<R>,
+    warnings: &mut Vec<String>,
+) -> Result<(Vec<GameRecord>, Vec<DraftPickRecord>)> {
     let headers = reader.headers()?.clone();
     let mut games = Vec::new();
     let mut draft_picks = Vec::new();

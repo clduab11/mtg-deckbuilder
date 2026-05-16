@@ -6,7 +6,7 @@ use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
@@ -175,6 +175,20 @@ fn format_from_path(path: &Path, explicit: Option<&str>) -> Result<String> {
         })
 }
 
+fn format_from_source_label(source_label: &str, explicit: Option<&str>) -> Result<String> {
+    if let Some(format) = explicit.filter(|format| *format != "auto") {
+        return Ok(format.to_lowercase());
+    }
+    let path = Path::new(source_label);
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| match ext.to_lowercase().as_str() {
+            "yml" => "yaml".to_string(),
+            other => other.to_string(),
+        })
+        .ok_or_else(|| anyhow!("Could not infer catalog format from source label: {source_label}"))
+}
+
 pub fn load_catalog_auto(path: impl AsRef<Path>) -> Result<LoadedCatalog> {
     load_catalog(path, None)
 }
@@ -207,6 +221,38 @@ pub fn load_catalog(
     })
 }
 
+pub fn load_catalog_from_str(
+    source_label: impl Into<String>,
+    explicit_format: Option<&str>,
+    text: &str,
+) -> Result<LoadedCatalog> {
+    let source_label = source_label.into();
+    let format = format_from_source_label(&source_label, explicit_format)?;
+    let mut warnings = Vec::new();
+    let cards = match format.as_str() {
+        "csv" => {
+            let reader = csv::Reader::from_reader(text.as_bytes());
+            load_csv_cards_from_reader(reader, &mut warnings)?
+        }
+        "json" => load_json_cards_from_str(text, &mut warnings)?,
+        "jsonl" | "ndjson" => load_jsonl_cards_from_str(text, &mut warnings)?,
+        "yaml" => load_yaml_cards_from_str(text, &mut warnings)?,
+        other => return Err(anyhow!("Unsupported catalog format: {other}")),
+    };
+    let card_count = cards.len();
+    let database = CardDatabase::from_cards(cards, Some(source_label.clone()));
+    Ok(LoadedCatalog {
+        database,
+        report: CatalogLoadReport {
+            schema_version: "catalog-load-report.v1".to_string(),
+            source_path: source_label,
+            format,
+            card_count,
+            warnings,
+        },
+    })
+}
+
 fn from_records(records: Vec<CatalogCardRecord>, warnings: &mut Vec<String>) -> Vec<Card> {
     records
         .into_iter()
@@ -220,6 +266,38 @@ fn from_records(records: Vec<CatalogCardRecord>, warnings: &mut Vec<String>) -> 
             }
         })
         .collect()
+}
+
+fn load_json_cards_from_str(text: &str, warnings: &mut Vec<String>) -> Result<Vec<Card>> {
+    let value: Value = serde_json::from_str(text)?;
+    if value.get("schema_version").is_some() && value.get("cards").is_some() {
+        let document: CatalogDocument = serde_json::from_value(value)?;
+        ensure_catalog_v1(&document.schema_version)?;
+        return Ok(from_records(document.cards, warnings));
+    }
+    if let Some(records) = value.get("data").and_then(Value::as_array) {
+        let records: Vec<CatalogCardRecord> =
+            serde_json::from_value(Value::Array(records.clone()))?;
+        return Ok(from_records(records, warnings));
+    }
+    if let Some(data) = value.get("data").and_then(Value::as_object) {
+        let records = data
+            .values()
+            .filter_map(|set| set.get("cards").and_then(Value::as_array))
+            .flat_map(|cards| cards.iter().cloned())
+            .collect::<Vec<_>>();
+        if !records.is_empty() {
+            let records: Vec<CatalogCardRecord> = serde_json::from_value(Value::Array(records))?;
+            return Ok(from_records(records, warnings));
+        }
+    }
+    if value.get("cards").is_some() {
+        let document: CatalogDocument = serde_json::from_value(value)?;
+        ensure_catalog_v1(&document.schema_version)?;
+        return Ok(from_records(document.cards, warnings));
+    }
+    let records: Vec<CatalogCardRecord> = serde_json::from_value(value)?;
+    Ok(from_records(records, warnings))
 }
 
 fn load_json_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>> {
@@ -277,9 +355,28 @@ fn load_jsonl_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>
     Ok(from_records(records, warnings))
 }
 
+fn load_jsonl_cards_from_str(text: &str, warnings: &mut Vec<String>) -> Result<Vec<Card>> {
+    let mut records = Vec::new();
+    for (idx, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let record: CatalogCardRecord = serde_json::from_str(line)
+            .map_err(|error| anyhow!("JSONL line {}: {error}", idx + 1))?;
+        records.push(record);
+    }
+    Ok(from_records(records, warnings))
+}
+
 fn load_yaml_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>> {
     let text = std::fs::read_to_string(path)?;
     let document: CatalogDocument = serde_yml::from_str(&text)?;
+    ensure_catalog_v1(&document.schema_version)?;
+    Ok(from_records(document.cards, warnings))
+}
+
+fn load_yaml_cards_from_str(text: &str, warnings: &mut Vec<String>) -> Result<Vec<Card>> {
+    let document: CatalogDocument = serde_yml::from_str(text)?;
     ensure_catalog_v1(&document.schema_version)?;
     Ok(from_records(document.cards, warnings))
 }
@@ -330,7 +427,14 @@ fn parse_legalities(value: &str) -> BTreeMap<String, String> {
 }
 
 fn load_csv_cards(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Card>> {
-    let mut reader = csv::Reader::from_path(path)?;
+    let reader = csv::Reader::from_path(path)?;
+    load_csv_cards_from_reader(reader, warnings)
+}
+
+fn load_csv_cards_from_reader<R: Read>(
+    mut reader: csv::Reader<R>,
+    warnings: &mut Vec<String>,
+) -> Result<Vec<Card>> {
     let headers = reader.headers()?.clone();
     let mut records = Vec::new();
     for (idx, row) in reader.records().enumerate() {

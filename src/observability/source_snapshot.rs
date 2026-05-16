@@ -20,3 +20,13 @@ pub fn file_sha256(path: impl AsRef<Path>) -> Result<String> {
         .map(|byte| format!("{byte:02x}"))
         .collect())
 }
+
+pub fn text_sha256(text: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(text.as_bytes());
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}

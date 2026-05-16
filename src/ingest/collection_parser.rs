@@ -2,6 +2,7 @@ use crate::core::models::CollectionIndex;
 use crate::core::normalization::normalize_name;
 use anyhow::{Result, anyhow};
 use std::collections::BTreeMap;
+use std::io::Read;
 use std::path::Path;
 
 const NAME_FIELD_CANDIDATES: &[&str] = &["Name", "Card Name", "CardName", "card_name", "name"];
@@ -36,9 +37,22 @@ fn find_field(fieldnames: &[String], candidates: &[&str]) -> Option<String> {
 }
 
 pub fn inspect_collection_schema(path: impl AsRef<Path>) -> Result<CollectionSchema> {
-    let mut reader = csv::ReaderBuilder::new()
+    let reader = csv::ReaderBuilder::new()
         .flexible(true)
         .from_path(path.as_ref())?;
+    inspect_collection_schema_from_reader(reader)
+}
+
+pub fn inspect_collection_schema_from_str(text: &str) -> Result<CollectionSchema> {
+    let reader = csv::ReaderBuilder::new()
+        .flexible(true)
+        .from_reader(text.as_bytes());
+    inspect_collection_schema_from_reader(reader)
+}
+
+fn inspect_collection_schema_from_reader<R: Read>(
+    mut reader: csv::Reader<R>,
+) -> Result<CollectionSchema> {
     let fields: Vec<String> = reader.headers()?.iter().map(str::to_string).collect();
     let mut sample_rows = Vec::new();
     for record in reader.records().take(3) {
@@ -65,6 +79,37 @@ pub fn parse_collection_csv(
 ) -> Result<CollectionIndex> {
     let path = path.as_ref();
     let schema = inspect_collection_schema(path)?;
+    let reader = csv::ReaderBuilder::new().flexible(true).from_path(path)?;
+    parse_collection_csv_from_reader(
+        reader,
+        Some(path.to_string_lossy().to_string()),
+        schema,
+        name_field,
+        count_field,
+    )
+}
+
+pub fn parse_collection_csv_from_str(
+    source_label: impl Into<String>,
+    text: &str,
+    name_field: Option<&str>,
+    count_field: Option<&str>,
+) -> Result<CollectionIndex> {
+    let source_label = source_label.into();
+    let schema = inspect_collection_schema_from_str(text)?;
+    let reader = csv::ReaderBuilder::new()
+        .flexible(true)
+        .from_reader(text.as_bytes());
+    parse_collection_csv_from_reader(reader, Some(source_label), schema, name_field, count_field)
+}
+
+fn parse_collection_csv_from_reader<R: Read>(
+    mut reader: csv::Reader<R>,
+    source_label: Option<String>,
+    schema: CollectionSchema,
+    name_field: Option<&str>,
+    count_field: Option<&str>,
+) -> Result<CollectionIndex> {
     let resolved_name = name_field
         .map(str::to_string)
         .or_else(|| schema.name_field.clone())
@@ -97,7 +142,6 @@ pub fn parse_collection_csv(
         ));
     }
 
-    let mut reader = csv::ReaderBuilder::new().flexible(true).from_path(path)?;
     let headers: Vec<String> = reader.headers()?.iter().map(str::to_string).collect();
     let name_idx = headers
         .iter()
@@ -109,7 +153,7 @@ pub fn parse_collection_csv(
         .unwrap();
 
     let mut collection = CollectionIndex {
-        source_path: Some(path.to_string_lossy().to_string()),
+        source_path: source_label,
         name_field: Some(resolved_name),
         count_field: Some(resolved_count),
         ..CollectionIndex::default()

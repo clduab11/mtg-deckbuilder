@@ -1,3 +1,4 @@
+pub mod analysis;
 pub mod api_contract;
 pub mod catalog;
 pub mod cli;
