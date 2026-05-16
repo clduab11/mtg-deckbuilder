@@ -23,7 +23,7 @@ Most MTG deck tools sell convenience around overlays, collection sync, pricing, 
 - JSON, Markdown, and CSV report rendering.
 - `llm_report.v1` structured artifact generation.
 - Backend-ready API contract structs and route constants.
-- Local-only Axum adapter for deterministic Rust services.
+- Local-only Axum web workbench for browser-based deck/catalog/result-log analysis, report replay, and exports.
 
 ## Architecture
 
@@ -42,7 +42,8 @@ src/
   report/              JSON, Markdown, CSV report rendering
   llm/                 structured LLM-ready artifacts only
   api_contract/        future web/API request and response structs
-  web.rs               local-only Axum adapter
+  web.rs               local-only Axum workbench and JSON API
+  web_assets/          embedded HTML/CSS/JS workbench assets
 ```
 
 ## Data Formats
@@ -119,6 +120,26 @@ cargo run --bin mtgdeckbuilder -- llm-artifact \
   --seed 42
 ```
 
+## Local Web Workbench
+
+Run the local browser workbench:
+
+```bash
+cargo run --bin mtgdeckbuilder-web
+```
+
+Then open `http://127.0.0.1:8765/`.
+
+The workbench processes pasted or uploaded text in memory through the Rust server:
+
+- decklists
+- user-supplied catalogs
+- optional collection CSV
+- optional structured `result-log.v1` CSV, JSON, or JSONL
+- existing `analysis-report.v1` JSON for report replay
+
+It does not control MTG Arena, watch logs, access a Steam or Wizards account, scrape clients, run overlays, or provide a hosted service.
+
 ## Simulation Model
 
 The simulator is Bo1/Bo3-oriented, not exact MTG Arena parity.
@@ -167,7 +188,16 @@ LLM support is deliberately outside the deterministic core. The CLI can emit `ll
 
 ## Web/API Readiness
 
-The repo includes backend-ready structs and route constants for:
+The repo includes a local-only Axum workbench plus backend-ready structs and route constants for future hosted adapters.
+
+Implemented local routes:
+
+- `GET /`
+- `GET /api/health`
+- `POST /api/analyze`
+- `POST /api/report/render`
+
+The route constants still describe future durable API contracts for:
 
 - `POST /deck/validate`
 - `POST /simulation/run`
@@ -176,7 +206,7 @@ The repo includes backend-ready structs and route constants for:
 - `GET /simulation/{id}/report`
 - `POST /export`
 
-The local Axum adapter is a development convenience. This repo does not currently ship a hosted API or dashboard.
+This repo does not currently ship a hosted API, account system, shared report store, or paid dashboard.
 
 ## Monetization / Product Direction
 
@@ -233,7 +263,8 @@ cargo run --bin mtgdeckbuilder -- llm-artifact --deck examples/sample_deck.txt -
 - Add archetype clustering from transparent feature vectors.
 - Add optional Arrow/Parquet export behind a deliberate analytics feature gate.
 - Add hosted-job adapters around the existing `api_contract` structs.
-- Add web dashboard only after the CLI/library contracts stabilize.
+- Extend the local workbench with saved local presets and richer comparison views.
+- Design future hosted dashboard/report-sharing work separately, with privacy, terms, and monetization review before implementation.
 
 ## License / Disclaimer
 
